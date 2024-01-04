@@ -1,0 +1,22 @@
+# Aspose.3D Wavefront OBJ Exporter
+# Copyright 2004-2023 Aspose Pty Ltd.
+# File created: 11/24/2023 17:42:59
+
+newmtl dingus
+	illum 2
+	Kd 1 1 1
+	Ke 0 0 0
+	Pr 0.8211145618000168
+	Pm 0
+	d 1
+	Tr 0
+	map_Kd dingus_baseColor.jpeg
+newmtl whiskers
+	illum 2
+	Kd 1 1 1
+	Ke 0 0 0
+	Pr 0.8211145618000168
+	Pm 0
+	d 1
+	Tr 0
+	map_Kd whiskers_baseColor.png
