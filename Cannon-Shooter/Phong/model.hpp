@@ -67,6 +67,8 @@ public:
      */
     void Render();
 
+    float maxVertexDistance();
+
 };
 
 #define MESH_HP

@@ -12,13 +12,10 @@
 #include "texture.hpp"
 
 
-float
-Clamp(float x, float min, float max) {
-    return x < min ? min : x > max ? max : x;
-}
 
-int WindowWidth = 1200;
-int WindowHeight = 900;
+
+int WindowWidth = 1600;
+int WindowHeight = 1200;
 const float TargetFPS = 60.0f;
 const std::string WindowTitle = "Cannon Shooter";
 
@@ -47,15 +44,6 @@ ErrorCallback(int error, const char* description) {
     std::cerr << "GLFW Error: " << description << std::endl;
 }
 
-/**
- * @brief Keyboard callback function for GLFW. See GLFW docs for details
- *
- * @param window GLFW window context object
- * @param key Triggered key GLFW code
- * @param scancode Triggered key scan code
- * @param action Triggered key action: pressed, released or repeated
- * @param mode Modifiers
- */
 static void
 KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     EngineState* State = (EngineState*)glfwGetWindowUserPointer(window);
@@ -85,11 +73,6 @@ FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-/**
- * @brief Updates engine state based on input
- * 
- * @param state EngineState
- */
 static void
 HandleInput(EngineState* state) {
     Input* UserInput = state->mInput;
@@ -107,20 +90,15 @@ HandleInput(EngineState* state) {
     if (UserInput->LookUp) FPSCamera->Rotate(0.0f, 1.0f, state->mDT);
 }
 
-/**
- * @brief Draws flattened cubes
- *
- * @param vao - Cube VAO
- * @param shader - Shader
- */
+
 static void
-DrawFloor(unsigned vao, const Shader& shader, unsigned diffuse, unsigned specular) {
+DrawFloor(unsigned vao, const Shader& shader, unsigned texture) {
     glUseProgram(shader.GetId());
     glBindVertexArray(vao);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, diffuse);
+    glBindTexture(GL_TEXTURE_2D, texture);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, specular);
+    glBindTexture(GL_TEXTURE_2D, NULL);
     float Size = 15.0f;
     for (int i = -8; i < 16; ++i) {
         for (int j = -8; j < 16; ++j) {
@@ -205,12 +183,17 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
-    unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/container_diffuse.png");
-    unsigned CubeSpecularTexture = Texture::LoadImageToTexture("res/container_specular.png");
-    unsigned FloorDiffuseTexture = Texture::LoadImageToTexture("res/sand.jpg");
-    unsigned FloorSpecularTexture = Texture::LoadImageToTexture("res/beach.jpg");
-    unsigned SkyboxTexture = Texture::LoadImageToTexture("res/skybox.png");
+    #pragma region texture_loading
 
+    unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/don.jpeg");
+    unsigned CubeSpecularTexture = Texture::LoadImageToTexture("res/container_specular.png");
+    unsigned FloorTexture1 = Texture::LoadImageToTexture("res/sand.jpg");
+    unsigned FloorTexture2 = Texture::LoadImageToTexture("res/beach.jpg");
+    unsigned SkyboxTexture = Texture::LoadImageToTexture("res/skybox.png");
+    
+    #pragma endregion 
+
+    #pragma region cube_setup
     std::vector<float> CubeVertices = {
         // X     Y     Z     NX    NY    NZ    U     V    FRONT SIDE
         -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // L D
@@ -271,8 +254,9 @@ int main() {
     glEnableVertexAttribArray(2);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+    #pragma endregion 
 
-    
+    #pragma region model_load
 
     Model Cat("res/maxwell_the_cat_dingus/scene.obj");
     if (!Cat.Load()) {
@@ -281,13 +265,13 @@ int main() {
         return -1;
     }
 
-    Model Beachball("res/beachball/beach_ball.obj");
+    //PRECNIK JE 0.2f
+    Model Beachball("res/beachball3/scene.obj");
     if (!Beachball.Load()) {
         std::cerr << "Failed to load beachball\n";
         glfwTerminate();
         return -1;
     }
-    
 
     Model Palm("res/palm/scene.obj");
     if (!Palm.Load()) {
@@ -295,7 +279,9 @@ int main() {
         glfwTerminate();
         return -1;
     }
+    #pragma endregion
 
+    #pragma region light_and_shader_setup
 
     Shader ColorShader("shaders/color.vert", "shaders/color.frag");
 
@@ -332,28 +318,24 @@ int main() {
     PhongShaderMaterialTexture.SetUniform1i("uMaterial.Kd", 0);
     PhongShaderMaterialTexture.SetUniform1i("uMaterial.Ks", 1);
     PhongShaderMaterialTexture.SetUniform1f("uMaterial.Shininess", 70.0f);  // Reduce shininess for a rough surface
-
     glUseProgram(0);
+
+    #pragma endregion
+
 
     glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
     glm::mat4 View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
     glm::mat4 ModelMatrix(1.0f);
     
-    // NOTE(Jovan): Current angle around Y axis, with regards to XZ plane at which the point light is situated at
-    float Angle = 0.0f;
-    // NOTE(Jovan): Distance of point light from center of rotation
-    float Distance = 5.0f;
+
     float TargetFrameTime = 1.0f / TargetFPS;
     float StartTime = glfwGetTime();
     float EndTime = glfwGetTime();
     glClearColor(0.1f, 0.1f, 0.2f, 0.0f);
 
-    float CatRotationAngle = glm::radians(45.0f);
-    float CatVerticalMotionAmplitude = 4.0f; 
-    float CatVerticalMotionFrequency = 1.0f;
 
 
-
+    
     Shader* CurrentShader = &PhongShaderMaterialTexture;
     while (!glfwWindowShouldClose(Window)) {
         glfwPollEvents();
@@ -362,20 +344,35 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // NOTE(Jovan): In case of window resize, update projection. Bit bad for performance to do it every iteration.
         // If laggy, remove this line
-        Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
+        //Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
         View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
         StartTime = glfwGetTime();
+
         glUseProgram(CurrentShader->GetId());
         CurrentShader->SetProjection(Projection);
         CurrentShader->SetView(View);
         CurrentShader->SetUniform3f("uViewPos", FPSCamera.GetPosition());
+        
+        #pragma region dynamic_elements_draw
 
+        /*float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(20.0f, 1.0f + verticalOffset, 20.0f));
+        ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
+        CurrentShader->SetModel(ModelMatrix);
+        Cat.Render();*/
+        
+        float scaling = 8.0f;
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(2.0f, 0.2f * scaling , 2.0f));
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling,scaling,scaling));
+        CurrentShader->SetModel(ModelMatrix);
+        Beachball.Render();
 
-        glm::vec3 PointLightPosition(30.0f, 25.0f, 30.0f);
-        CurrentShader->SetUniform3f("uPointLight.Position", PointLightPosition);
-        Angle += State.mDT;
-        CatRotationAngle += State.mDT * 8;
+        #pragma endregion
 
+        #pragma region static_elements_draw
 
         ModelMatrix = glm::mat4(1.0f);
         ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -387,41 +384,10 @@ int main() {
         glBindVertexArray(CubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, CubeVertices.size() / 8);
 
-
-        float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle/2);
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(20.0f, 1.0f + verticalOffset, 20.0f));
-        ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
-        CurrentShader->SetModel(ModelMatrix);
-        Cat.Render();
-
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(2.0f, 0.0f , 0.0f));
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
-        CurrentShader->SetModel(ModelMatrix);
-        Beachball.Render();
-
         AddPalms(ModelMatrix, CurrentShader, Palm);
+        DrawFloor(CubeVAO, *CurrentShader, FloorTexture1);
 
-
-        DrawFloor(CubeVAO, *CurrentShader, FloorDiffuseTexture, FloorSpecularTexture);
-
-        glUseProgram(ColorShader.GetId());
-        ColorShader.SetProjection(Projection);
-        ColorShader.SetView(View);
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, 1.0f, -2.0f));
-        ColorShader.SetModel(ModelMatrix);
-
-        // NOTE(Jovan): Draw point light
-        ModelMatrix = glm::translate(ModelMatrix, PointLightPosition);
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.5f));
-        ColorShader.SetModel(ModelMatrix);
-        glBindVertexArray(CubeVAO);
-        ColorShader.SetUniform3f("uColor", glm::vec3(0.0f, 1.0f, 0.0f));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-
+        #pragma endregion
 
 
         glBindVertexArray(0);
