@@ -42,3 +42,53 @@ Texture::LoadImageToTexture(const std::string& filePath) {
     stbi_image_free(ImageData);
     return Texture;
 }
+
+unsigned 
+Texture::LoadCubemap(std::vector<std::string>& filePaths) {
+    unsigned Texture;
+    glGenTextures(1, &Texture);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, Texture);
+
+    int width, height, channels;
+
+    for (GLuint i = 0; i < 6; ++i) {
+        // Load image data
+        unsigned char* imageData = stbi_load(filePaths[i].c_str(), &width, &height, &channels, 0);
+
+        if (!imageData) {
+            std::cerr << "Failed to load cubemap texture face: " << filePaths[i] << std::endl;
+            stbi_image_free(imageData); // Free previously allocated data
+            continue; // Skip this face and continue with the next
+        }
+
+        // Vertical flip if necessary
+        stbi__vertical_flip(imageData, width, height, channels);
+
+        // Determine internal format based on the number of channels
+        GLint internalFormat = -1;
+        switch (channels) {
+        case 1: internalFormat = GL_RED; break;
+        case 3: internalFormat = GL_RGB; break;
+        case 4: internalFormat = GL_RGBA; break;
+        default: internalFormat = GL_RGB; break;
+        }
+
+        // Specify texture data for each face
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, width, height, 0, internalFormat, GL_UNSIGNED_BYTE, imageData);
+
+        // Free the image data
+        stbi_image_free(imageData);
+    }
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Unbind texture
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+    return Texture;
+}

@@ -10,6 +10,11 @@
 #include "camera.hpp"
 #include "model.hpp"
 #include "texture.hpp"
+#include "stb_image.h"
+#include "physics.hpp"
+#include <list>
+#include <random>
+using namespace std;
 
 
 
@@ -32,6 +37,7 @@ struct Input {
     bool LookUp;
     bool LookDown;
 };
+
 
 struct EngineState {
     Input* mInput;
@@ -142,6 +148,37 @@ void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
     RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, -x / 2));
 }
 
+
+unsigned int loadCubemap(vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
+}
+
 int main() {
     GLFWwindow* Window = 0;
     if (!glfwInit()) {
@@ -185,11 +222,19 @@ int main() {
 
     #pragma region texture_loading
 
+    vector<std::string> faces;
+    for(int i = 0;i<6;i++)
+    {
+        faces.push_back("res/don.jpeg");
+    }
+    unsigned int cubemapTexture = Texture::LoadCubemap(faces);
+
     unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/don.jpeg");
     unsigned CubeSpecularTexture = Texture::LoadImageToTexture("res/container_specular.png");
     unsigned FloorTexture1 = Texture::LoadImageToTexture("res/sand.jpg");
     unsigned FloorTexture2 = Texture::LoadImageToTexture("res/beach.jpg");
     unsigned SkyboxTexture = Texture::LoadImageToTexture("res/skybox.png");
+
     
     #pragma endregion 
 
@@ -256,6 +301,65 @@ int main() {
     glBindVertexArray(0);
     #pragma endregion 
 
+    #pragma region skybox_setup
+
+    float skyboxVertices[] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f
+    };
+
+    // skybox VAO
+    unsigned int skyboxVAO, skyboxVBO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+    #pragma endregion
+
     #pragma region model_load
 
     Model Cat("res/maxwell_the_cat_dingus/scene.obj");
@@ -284,7 +388,7 @@ int main() {
     #pragma region light_and_shader_setup
 
     Shader ColorShader("shaders/color.vert", "shaders/color.frag");
-
+    Shader SkyboxShader("shaders/skybox.vert", "shaders/skybox.frag");
     Shader PhongShaderMaterialTexture("shaders/basic.vert", "shaders/phong_material_texture.frag");
     glUseProgram(PhongShaderMaterialTexture.GetId());
     // Adjust directional light (sun)
@@ -322,6 +426,19 @@ int main() {
 
     #pragma endregion
 
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Define the range
+    std::uniform_real_distribution<float> dis(-2.0f, 2.0f);
+
+    list<Sphere*> SphereList;
+    for (int i = 1; i < 6; i++) {
+        float pos = static_cast<float>(i * 3);
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(-pos + 10.f, pos , -30.0f), glm::vec3(dis(gen), dis(gen), dis(gen)) };
+        SphereList.push_back(sphere);
+    }
+
 
     glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
     glm::mat4 View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
@@ -332,7 +449,6 @@ int main() {
     float StartTime = glfwGetTime();
     float EndTime = glfwGetTime();
     glClearColor(0.1f, 0.1f, 0.2f, 0.0f);
-
 
 
     
@@ -347,11 +463,32 @@ int main() {
         //Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
         View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
         StartTime = glfwGetTime();
+        
+
+        #pragma region skybox
+
+        glDepthFunc(GL_LEQUAL); 
+        glBindVertexArray(skyboxVAO);
+        glUseProgram(SkyboxShader.GetId());
+        ModelMatrix = glm::mat4(1.0f);
+        SkyboxShader.SetProjection(Projection);
+        SkyboxShader.SetView(glm::mat4(glm::mat3(View)));
+        SkyboxShader.SetUniform3f("uViewPos", FPSCamera.GetPosition());
+        SkyboxShader.SetModel(ModelMatrix);
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS);
+
+        #pragma endregion
 
         glUseProgram(CurrentShader->GetId());
         CurrentShader->SetProjection(Projection);
         CurrentShader->SetView(View);
         CurrentShader->SetUniform3f("uViewPos", FPSCamera.GetPosition());
+
         
         #pragma region dynamic_elements_draw
 
@@ -363,12 +500,15 @@ int main() {
         CurrentShader->SetModel(ModelMatrix);
         Cat.Render();*/
         
-        float scaling = 8.0f;
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(2.0f, 0.2f * scaling , 2.0f));
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling,scaling,scaling));
-        CurrentShader->SetModel(ModelMatrix);
-        Beachball.Render();
+        for (auto sphere : SphereList) {
+            float scaling = sphere->Radius/0.2f;
+            ModelMatrix = glm::mat4(1.0f);
+            ModelMatrix = glm::translate(ModelMatrix, sphere->Position);
+            ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+            CurrentShader->SetModel(ModelMatrix);
+            Beachball.Render();
+            updateSphere(sphere, State.mDT);
+        }
 
         #pragma endregion
 
@@ -378,9 +518,9 @@ int main() {
         ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, 1.0f, 0.0f));
         CurrentShader->SetModel(ModelMatrix);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, CubeDiffuseTexture);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, CubeSpecularTexture);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
         glBindVertexArray(CubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, CubeVertices.size() / 8);
 
@@ -388,6 +528,8 @@ int main() {
         DrawFloor(CubeVAO, *CurrentShader, FloorTexture1);
 
         #pragma endregion
+        
+        
 
 
         glBindVertexArray(0);

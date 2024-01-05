@@ -2,6 +2,7 @@
 #include <string>
 #include <GL/glew.h>
 #include <iostream>
+#include <vector>
 
 static const std::string MISSING_TEXTURE_PATH = "res/missing_texture";
 
@@ -17,4 +18,5 @@ public:
 	 * @returns TextureID
 	 */
 	static unsigned LoadImageToTexture(const std::string& filePath);
+	static unsigned LoadCubemap(std::vector<std::string>& filePaths);
 };
