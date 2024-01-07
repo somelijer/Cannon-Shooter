@@ -60,6 +60,16 @@ glm::vec3 calculateDragForce(const glm::vec3& speed, double dragConst) {
 }
 
 
+void CheckConstraints(Sphere* sphere)
+{
+    float floorHeight = 0.1f;
+    if (sphere->Position.y - sphere->Radius < floorHeight) {
+        sphere->Position.y = floorHeight + sphere->Radius;
+        sphere->Velocity.y *= -1;
+        sphere->Velocity *= 0.8;
+    }
+}
+
 void updateSphere(Sphere* sphere,float dt) {
 
     float mass = sphere->Mass;
@@ -86,11 +96,7 @@ void updateSphere(Sphere* sphere,float dt) {
         return f_rez.z / float(mass);
         };
 
-    if (sphere->Position.y - sphere->Radius < 0.0f) {
-        sphere->Position.y = 0.0f + sphere->Radius;
-        sphere->Velocity.y *= -1;
-        sphere->Velocity *= 0.8;
-    }
+    CheckConstraints(sphere);
 
     rk4Step(sphere->Position, sphere->Velocity, accelerationX, accelerationY, accelerationZ, dt);
 }

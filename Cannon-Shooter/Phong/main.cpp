@@ -23,6 +23,8 @@ int WindowWidth = 1600;
 int WindowHeight = 1200;
 const float TargetFPS = 60.0f;
 const std::string WindowTitle = "Cannon Shooter";
+double lastX = 90;
+double lastY = 90;
 
 
 struct Input {
@@ -32,16 +34,22 @@ struct Input {
     bool MoveBackward;
     bool MoveUp;
     bool MoveDown;
-    bool LookLeft;
-    bool LookRight;
-    bool LookUp;
-    bool LookDown;
+    bool CannonLeft;
+    bool CannonRight;
+    bool CannonUp;
+    bool CannonDown;
+};
+
+struct CannonState {
+    float mPitch;
+    float mYaw;
 };
 
 
 struct EngineState {
     Input* mInput;
     Camera* mCamera;
+    CannonState* mCannonState;
     float mDT;
 };
 
@@ -63,10 +71,10 @@ KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     case GLFW_KEY_LEFT_SHIFT: UserInput->MoveDown = IsDown; break;
     case GLFW_KEY_SPACE: UserInput->MoveUp = IsDown; break;
 
-    case GLFW_KEY_RIGHT: UserInput->LookLeft = IsDown; break;
-    case GLFW_KEY_LEFT: UserInput->LookRight = IsDown; break;
-    case GLFW_KEY_UP: UserInput->LookUp = IsDown; break;
-    case GLFW_KEY_DOWN: UserInput->LookDown = IsDown; break;
+    case GLFW_KEY_RIGHT: UserInput->CannonLeft = IsDown; break;
+    case GLFW_KEY_LEFT: UserInput->CannonRight = IsDown; break;
+    case GLFW_KEY_UP: UserInput->CannonUp = IsDown; break;
+    case GLFW_KEY_DOWN: UserInput->CannonDown = IsDown; break;
 
     case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
     }
@@ -80,6 +88,36 @@ FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
 }
 
 static void
+mouseCallback(GLFWwindow* window, double xPos, double yPos) {
+    // Calculate the change in mouse position
+    float deltaX = xPos - lastX;
+    float deltaY = lastY - yPos;  // Reversed since y-coordinates go from bottom to top
+
+    EngineState* State = (EngineState*)glfwGetWindowUserPointer(window);
+    Camera* mCamera = State->mCamera;
+
+    // Update camera orientation (adjust these parameters based on your needs)
+    float sensitivity = 0.2f;
+    deltaX *= sensitivity;
+    deltaY *= sensitivity;
+
+    mCamera->UpdateOrientation(deltaX, deltaY);
+
+    // Save current mouse position for the next frame
+    lastX = xPos;
+    lastY = yPos;
+}
+
+void UpdateCannon(float deltaX, float deltaY,CannonState* state) {
+
+    state->mPitch += deltaY;
+    state->mYaw += deltaX;
+
+    if (state->mPitch > 89.0f) state->mPitch = 89.0f;
+    if (state->mPitch < -89.0f) state->mPitch = -89.0f;
+}
+
+static void
 HandleInput(EngineState* state) {
     Input* UserInput = state->mInput;
     Camera* FPSCamera = state->mCamera;
@@ -90,11 +128,12 @@ HandleInput(EngineState* state) {
     if (UserInput->MoveDown) FPSCamera->Move(0.0f, 0.0f, -1.0f ,state->mDT);
     if (UserInput->MoveUp) FPSCamera->Move(0.0f, 0.0f, 1.0f ,state->mDT);
 
-    if (UserInput->LookLeft) FPSCamera->Rotate(1.0f, 0.0f, state->mDT);
-    if (UserInput->LookRight) FPSCamera->Rotate(-1.0f, 0.0f, state->mDT);
-    if (UserInput->LookDown) FPSCamera->Rotate(0.0f, -1.0f, state->mDT);
-    if (UserInput->LookUp) FPSCamera->Rotate(0.0f, 1.0f, state->mDT);
+    if (UserInput->CannonLeft) UpdateCannon(1.0f, 0.0f,state->mCannonState);
+    if (UserInput->CannonRight) UpdateCannon(-1.0f, 0.0f, state->mCannonState);
+    if (UserInput->CannonDown) UpdateCannon(0.0f, -1.0f, state->mCannonState);
+    if (UserInput->CannonUp) UpdateCannon(0.0f, 1.0f, state->mCannonState);
 }
+
 
 
 static void
@@ -210,23 +249,31 @@ int main() {
     Input UserInput = { 0 };
     State.mCamera = &FPSCamera;
     State.mInput = &UserInput;
+    CannonState cannonInfo;
+    cannonInfo.mPitch = 0.0f;
+    cannonInfo.mYaw = 0.0f;
+    State.mCannonState = &cannonInfo;
     glfwSetWindowUserPointer(Window, &State);
 
     glfwSetErrorCallback(ErrorCallback);
     glfwSetFramebufferSizeCallback(Window, FramebufferSizeCallback);
     glfwSetKeyCallback(Window, KeyCallback);
+    glfwSetCursorPosCallback(Window, mouseCallback);
 
     glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     #pragma region texture_loading
 
     vector<std::string> faces;
-    for(int i = 0;i<6;i++)
-    {
-        faces.push_back("res/don.jpeg");
-    }
+    faces.push_back("res/images/skybox/right.tga");
+    faces.push_back("res/images/skybox/left.tga");
+    faces.push_back("res/images/skybox/top.tga");
+    faces.push_back("res/images/skybox/bottom.tga");
+    faces.push_back("res/images/skybox/back.tga");
+    faces.push_back("res/images/skybox/front.tga");
     unsigned int cubemapTexture = Texture::LoadCubemap(faces);
 
     unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/don.jpeg");
@@ -234,6 +281,8 @@ int main() {
     unsigned FloorTexture1 = Texture::LoadImageToTexture("res/sand.jpg");
     unsigned FloorTexture2 = Texture::LoadImageToTexture("res/beach.jpg");
     unsigned SkyboxTexture = Texture::LoadImageToTexture("res/skybox.png");
+    unsigned MetalTexture = Texture::LoadImageToTexture("res/metal.jpg");
+    unsigned RustyMetalTexture = Texture::LoadImageToTexture("res/rusty_metal.jpg");
 
     
     #pragma endregion 
@@ -383,6 +432,13 @@ int main() {
         glfwTerminate();
         return -1;
     }
+
+    Model Cannon("res/cannon/scene.obj");
+    if (!Cannon.Load()) {
+        std::cerr << "Failed to load cannon\n";
+        glfwTerminate();
+        return -1;
+    }
     #pragma endregion
 
     #pragma region light_and_shader_setup
@@ -430,12 +486,12 @@ int main() {
     std::mt19937 gen(rd());
 
     // Define the range
-    std::uniform_real_distribution<float> dis(-2.0f, 2.0f);
+    std::uniform_real_distribution<float> dis(-10.0f, 10.0f);
 
     list<Sphere*> SphereList;
-    for (int i = 1; i < 6; i++) {
+    for (int i = 1; i < 15; i++) {
         float pos = static_cast<float>(i * 3);
-        Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(-pos + 10.f, pos , -30.0f), glm::vec3(dis(gen), dis(gen), dis(gen)) };
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, dis(gen) + 10.0f , -30.0f + dis(gen)/2), glm::vec3(dis(gen), dis(gen), dis(gen)) };
         SphereList.push_back(sphere);
     }
 
@@ -448,7 +504,8 @@ int main() {
     float TargetFrameTime = 1.0f / TargetFPS;
     float StartTime = glfwGetTime();
     float EndTime = glfwGetTime();
-    glClearColor(0.1f, 0.1f, 0.2f, 0.0f);
+
+    glClearColor(0.604f, 0.792f, 0.906f, 0.0f);
 
 
     
@@ -465,6 +522,7 @@ int main() {
         StartTime = glfwGetTime();
         
 
+
         #pragma region skybox
 
         glDepthFunc(GL_LEQUAL); 
@@ -477,7 +535,7 @@ int main() {
         SkyboxShader.SetModel(ModelMatrix);
         glBindVertexArray(skyboxVAO);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glBindTexture(GL_TEXTURE_2D, CubeDiffuseTexture);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
         glDepthFunc(GL_LESS);
@@ -499,6 +557,30 @@ int main() {
         ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
         CurrentShader->SetModel(ModelMatrix);
         Cat.Render();*/
+
+        float PitchRadians = glm::radians(State.mCannonState->mPitch);
+        float YawRadians = glm::radians(State.mCannonState->mYaw);
+        glm::vec3 TurnVector;
+        TurnVector.z = glm::sin(YawRadians);
+        TurnVector.y = 0.0f;
+        TurnVector.x = glm::cos(YawRadians);
+
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(5.0f, 0.8f, 0.0f));
+        ModelMatrix = glm::rotate(ModelMatrix, YawRadians, glm::vec3(0.0f, 1.0f, 0.0f));
+        ModelMatrix = glm::rotate(ModelMatrix, PitchRadians, TurnVector);
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(3.0f));
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, RustyMetalTexture);
+        CurrentShader->SetModel(ModelMatrix);
+        Cannon.Render();
+
+        float scaling = 0.4f / 0.2f;
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(5.0f, 2.0f, 0.0f));
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+        CurrentShader->SetModel(ModelMatrix);
+        Beachball.Render();
         
         for (auto sphere : SphereList) {
             float scaling = sphere->Radius/0.2f;
@@ -514,18 +596,39 @@ int main() {
 
         #pragma region static_elements_draw
 
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, 1.0f, 0.0f));
-        CurrentShader->SetModel(ModelMatrix);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-        glBindVertexArray(CubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, CubeVertices.size() / 8);
 
         AddPalms(ModelMatrix, CurrentShader, Palm);
         DrawFloor(CubeVAO, *CurrentShader, FloorTexture1);
+
+        glDepthFunc(GL_LEQUAL);
+        glUseProgram(SkyboxShader.GetId());
+        glm::vec3 PointLightPosition(0.0f, 25.0f, 0.0f);
+        SkyboxShader.SetUniform3f("uPointLight.Position", PointLightPosition);
+        SkyboxShader.SetProjection(Projection);
+        SkyboxShader.SetView(View);
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, 1.0f, 0.0f));
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(50.0f));
+        SkyboxShader.SetModel(ModelMatrix);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, CubeSpecularTexture);
+        glBindVertexArray(skyboxVAO);
+        glDrawArrays(GL_TRIANGLES, 0, CubeVertices.size() / 8);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS);
+
+        glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+        glUseProgram(SkyboxShader.GetId());
+        View = glm::mat4(glm::mat3(View)); // remove translation from the view matrix
+        //SkyboxShader.setMat4("view", View);
+        //SkyboxShader.setMat4("projection", Projection);
+        // skybox cube
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS);
 
         #pragma endregion
         
@@ -547,6 +650,7 @@ int main() {
         State.mDT = EndTime - StartTime;
     }
 
+    glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     glfwTerminate();
     return 0;
 }

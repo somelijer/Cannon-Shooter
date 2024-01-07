@@ -56,6 +56,8 @@ public:
      */
     glm::vec3 GetUp();
 
+    void UpdateOrientation(float deltaX, float deltaY);
+
 
 private:
     glm::vec3 mWorldUp;

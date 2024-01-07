@@ -12,6 +12,8 @@ struct Sphere {
     glm::vec3 Velocity;
 };
 
+void CheckConstraints(Sphere* sphere);
+
 void updateSphere(Sphere* sphere, float dt);
 
 #endif // PHYSICS_HPP

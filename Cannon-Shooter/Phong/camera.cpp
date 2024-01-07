@@ -58,6 +58,17 @@ Camera::GetUp() {
     return mUp;
 }
 
+void Camera::UpdateOrientation(float deltaX, float deltaY) {
+
+    mPitch += deltaY;
+    mYaw += deltaX;
+
+    if (mPitch > 89.0f) mPitch = 89.0f;
+    if (mPitch < -89.0f) mPitch = -89.0f;
+
+    updateVectors();
+}
+
 void 
 Camera::updateVectors() {
     mFront.x = cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
