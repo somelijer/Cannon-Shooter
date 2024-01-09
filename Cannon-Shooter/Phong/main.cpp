@@ -25,7 +25,8 @@ const float TargetFPS = 60.0f;
 const std::string WindowTitle = "Cannon Shooter";
 double lastX = 90;
 double lastY = 90;
-
+list<Sphere*> SphereList;
+float LastShootTime = glfwGetTime();
 
 struct Input {
     bool MoveLeft;
@@ -38,11 +39,14 @@ struct Input {
     bool CannonRight;
     bool CannonUp;
     bool CannonDown;
+    bool ShootCannon;
 };
 
 struct CannonState {
     float mPitch;
     float mYaw;
+    glm::vec3 mBarrelEnd;
+    glm::vec3 mForwardVector;
 };
 
 
@@ -75,6 +79,7 @@ KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     case GLFW_KEY_LEFT: UserInput->CannonRight = IsDown; break;
     case GLFW_KEY_UP: UserInput->CannonUp = IsDown; break;
     case GLFW_KEY_DOWN: UserInput->CannonDown = IsDown; break;
+    case GLFW_KEY_ENTER: UserInput->ShootCannon = IsDown; break;
 
     case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
     }
@@ -110,12 +115,21 @@ mouseCallback(GLFWwindow* window, double xPos, double yPos) {
 
 void UpdateCannon(float deltaX, float deltaY,CannonState* state) {
 
-    float CannonPitchLimit = 60.0f;
+    float CannonPitchLimit = 90.0f;
     state->mPitch += deltaY;
     state->mYaw += deltaX;
 
     if (state->mPitch > CannonPitchLimit) state->mPitch = CannonPitchLimit;
     if (state->mPitch < -CannonPitchLimit) state->mPitch = -CannonPitchLimit;
+}
+
+void ShootBall(EngineState* state) {
+    if (glfwGetTime() - LastShootTime > 0.5) {
+        float speed = 20.0f;
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, state->mCannonState->mForwardVector * speed };
+        SphereList.push_back(sphere);
+        LastShootTime = glfwGetTime();
+    }
 }
 
 static void
@@ -133,6 +147,7 @@ HandleInput(EngineState* state) {
     if (UserInput->CannonRight) UpdateCannon(-1.0f, 0.0f, state->mCannonState);
     if (UserInput->CannonDown) UpdateCannon(0.0f, -1.0f, state->mCannonState);
     if (UserInput->CannonUp) UpdateCannon(0.0f, 1.0f, state->mCannonState);
+    if (UserInput->ShootCannon) ShootBall(state );
 }
 
 
@@ -187,6 +202,7 @@ void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
     RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, x / 2));
     RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, -x / 2));
 }
+
 
 
 unsigned int loadCubemap(vector<std::string> faces)
@@ -251,7 +267,7 @@ int main() {
     State.mCamera = &FPSCamera;
     State.mInput = &UserInput;
     CannonState cannonInfo;
-    cannonInfo.mPitch = 0.0f;
+    cannonInfo.mPitch = 90.0f;
     cannonInfo.mYaw = 0.0f;
     State.mCannonState = &cannonInfo;
     glfwSetWindowUserPointer(Window, &State);
@@ -489,7 +505,7 @@ int main() {
     // Define the range
     std::uniform_real_distribution<float> dis(-10.0f, 10.0f);
 
-    list<Sphere*> SphereList;
+    
     for (int i = 1; i < 15; i++) {
         float pos = static_cast<float>(i * 3);
         Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, dis(gen) + 10.0f , -30.0f + dis(gen)/2), glm::vec3(dis(gen), dis(gen), dis(gen)) };
@@ -567,7 +583,8 @@ int main() {
         float PitchRadians = glm::radians(State.mCannonState->mPitch);
         float YawRadians = glm::radians(State.mCannonState->mYaw);
         float CannonLenght = 2.5f;
-        glm::vec3 CannonCenterDelta = glm::vec3(0.0f, -1.15f, 0.0f);
+        float CannonScale = 3.5f;
+        glm::vec3 CannonCenterDelta = glm::vec3(0.0f, -0.4429f * CannonScale, 0.0f);
 
         glm::vec3 CannonTurnVector;
         CannonTurnVector.x = glm::sin(YawRadians);
@@ -578,8 +595,8 @@ int main() {
         CannonForwardVector.z = -glm::sin(YawRadians) * glm::cos(PitchRadians);
         CannonForwardVector.y = glm::sin(PitchRadians);
         CannonForwardVector.x = glm::cos(YawRadians) * glm::cos(PitchRadians);
-        CannonForwardVector = glm::normalize(CannonForwardVector);
-        glm::vec3 barrelEnd = CannonPos  + CannonLenght * CannonForwardVector;
+        State.mCannonState->mForwardVector = glm::normalize(CannonForwardVector);
+        State.mCannonState->mBarrelEnd = CannonPos + CannonLenght * CannonForwardVector + glm::vec3(0.0f, 1.50f, 0.0f);
 
         ModelMatrix = glm::mat4(1.0f);
         ModelMatrix = glm::translate(ModelMatrix, CannonPos);
@@ -587,7 +604,7 @@ int main() {
         ModelMatrix = glm::rotate(ModelMatrix, PitchRadians, CannonTurnVector);
         ModelMatrix = glm::rotate(ModelMatrix, YawRadians, glm::vec3(0.0f, 1.0f, 0.0f));
         ModelMatrix = glm::translate(ModelMatrix, CannonCenterDelta);
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(3.5f));
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(CannonScale));
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, RustyMetalTexture);
         CurrentShader->SetModel(ModelMatrix);
@@ -598,7 +615,7 @@ int main() {
 
 
         // Extract the transformed position as glm::vec3
-        glm::vec3 ballPosition = glm::vec3(barrelEnd) + glm::vec3(0.0f,1.60f,0.0f);
+        glm::vec3 ballPosition = glm::vec3(State.mCannonState->mBarrelEnd) ;
 
         ModelMatrix = glm::mat4(1.0f);
         ModelMatrix = glm::translate(ModelMatrix, ballPosition);
