@@ -110,11 +110,12 @@ mouseCallback(GLFWwindow* window, double xPos, double yPos) {
 
 void UpdateCannon(float deltaX, float deltaY,CannonState* state) {
 
+    float CannonPitchLimit = 60.0f;
     state->mPitch += deltaY;
     state->mYaw += deltaX;
 
-    if (state->mPitch > 89.0f) state->mPitch = 89.0f;
-    if (state->mPitch < -89.0f) state->mPitch = -89.0f;
+    if (state->mPitch > CannonPitchLimit) state->mPitch = CannonPitchLimit;
+    if (state->mPitch < -CannonPitchLimit) state->mPitch = -CannonPitchLimit;
 }
 
 static void
@@ -507,6 +508,10 @@ int main() {
 
     glClearColor(0.604f, 0.792f, 0.906f, 0.0f);
 
+    float CatRotationAngle = glm::radians(45.0f);
+    float CatVerticalMotionAmplitude = 4.0f; 
+    float CatVerticalMotionFrequency = 1.0f;
+    glm::vec3 CannonPos = glm::vec3(5.0f, 0.8f, 0.0f);
 
     
     Shader* CurrentShader = &PhongShaderMaterialTexture;
@@ -550,34 +555,53 @@ int main() {
         
         #pragma region dynamic_elements_draw
 
-        /*float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
+        CatRotationAngle += State.mDT * 8;
+        /**/float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
         ModelMatrix = glm::mat4(1.0f);
         ModelMatrix = glm::translate(ModelMatrix, glm::vec3(20.0f, 1.0f + verticalOffset, 20.0f));
         ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
         ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
         CurrentShader->SetModel(ModelMatrix);
-        Cat.Render();*/
+        Cat.Render();
 
         float PitchRadians = glm::radians(State.mCannonState->mPitch);
         float YawRadians = glm::radians(State.mCannonState->mYaw);
-        glm::vec3 TurnVector;
-        TurnVector.z = glm::sin(YawRadians);
-        TurnVector.y = 0.0f;
-        TurnVector.x = glm::cos(YawRadians);
+        float CannonLenght = 2.5f;
+        glm::vec3 CannonCenterDelta = glm::vec3(0.0f, -1.15f, 0.0f);
+
+        glm::vec3 CannonTurnVector;
+        CannonTurnVector.x = glm::sin(YawRadians);
+        CannonTurnVector.y = 0.0f;
+        CannonTurnVector.z = glm::cos(YawRadians);
+
+        glm::vec3 CannonForwardVector;
+        CannonForwardVector.z = -glm::sin(YawRadians) * glm::cos(PitchRadians);
+        CannonForwardVector.y = glm::sin(PitchRadians);
+        CannonForwardVector.x = glm::cos(YawRadians) * glm::cos(PitchRadians);
+        CannonForwardVector = glm::normalize(CannonForwardVector);
+        glm::vec3 barrelEnd = CannonPos  + CannonLenght * CannonForwardVector;
 
         ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(5.0f, 0.8f, 0.0f));
+        ModelMatrix = glm::translate(ModelMatrix, CannonPos);
+        ModelMatrix = glm::translate(ModelMatrix,- CannonCenterDelta);
+        ModelMatrix = glm::rotate(ModelMatrix, PitchRadians, CannonTurnVector);
         ModelMatrix = glm::rotate(ModelMatrix, YawRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        ModelMatrix = glm::rotate(ModelMatrix, PitchRadians, TurnVector);
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(3.0f));
+        ModelMatrix = glm::translate(ModelMatrix, CannonCenterDelta);
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(3.5f));
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, RustyMetalTexture);
         CurrentShader->SetModel(ModelMatrix);
         Cannon.Render();
 
         float scaling = 0.4f / 0.2f;
+
+
+
+        // Extract the transformed position as glm::vec3
+        glm::vec3 ballPosition = glm::vec3(barrelEnd) + glm::vec3(0.0f,1.60f,0.0f);
+
         ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(5.0f, 2.0f, 0.0f));
+        ModelMatrix = glm::translate(ModelMatrix, ballPosition);
         ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
         CurrentShader->SetModel(ModelMatrix);
         Beachball.Render();
@@ -624,7 +648,7 @@ int main() {
         //SkyboxShader.setMat4("projection", Projection);
         // skybox cube
         glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE0);
+        glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
