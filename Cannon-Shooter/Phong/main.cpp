@@ -201,8 +201,8 @@ DrawFloor(unsigned vao, const Shader& shader, unsigned texture) {
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, texture);
     float Size = 15.0f;
-    for (int i = -8; i < 16; ++i) {
-        for (int j = -8; j < 16; ++j) {
+    for (int i = -16; i < 32; ++i) {
+        for (int j = -16; j < 32; ++j) {
             glm::mat4 Model(1.0f);
             Model = glm::translate(Model, glm::vec3(i * Size, 0.0f, j * Size));
             Model = glm::scale(Model, glm::vec3(Size, 0.1f, Size));
@@ -241,6 +241,26 @@ void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
     RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, -x / 2));
     RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, x / 2));
     RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, -x / 2));
+
+    float spacing = 60.0f;
+
+    // Add palms in a circular pattern around the map
+    for (float angle = 0.0f; angle < 360.0f; angle += 23.5f) {
+        float radians = glm::radians(angle);
+        float x = glm::cos(radians) * spacing;
+        float z = glm::sin(radians) * spacing;
+        RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, z));
+    }
+
+    spacing = 90.0f;
+
+    // Add palms in a circular pattern around the map
+    for (float angle = 12.0f; angle < 382.0f; angle += 16.8f) {
+        float radians = glm::radians(angle);
+        float x = glm::cos(radians) * spacing;
+        float z = glm::sin(radians) * spacing;
+        RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, z));
+    }
 }
 
 
@@ -503,6 +523,13 @@ int main() {
         glfwTerminate();
         return -1;
     }
+    
+    Model Balloon("res/balloon/scene.obj");
+    if (!Balloon.Load()) {
+        std::cerr << "Failed to load cannon\n";
+        glfwTerminate();
+        return -1;
+    }
     #pragma endregion
 
     #pragma region light_and_shader_setup
@@ -518,7 +545,7 @@ int main() {
 
     glUseProgram(PhongShaderMaterialTexture.GetId());
     // Adjust directional light (sun)
-    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Direction", glm::vec3(1.0f, -1.0f, 0.0f));
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Direction", glm::vec3(1.0f, -1.0f, 0.5f));
     PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ka", glm::vec3(0.8f, 0.8f, 0.6f));  // Warm ambient color
     PhongShaderMaterialTexture.SetUniform3f("uDirLight.Kd", glm::vec3(0.9f, 0.9f, 0.7f));  // Diffuse color
     PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular color
@@ -532,7 +559,7 @@ int main() {
     PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kq", 0.032f);
 
     // Adjust spotlight (simulating the sun casting shadows)
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(0.0f, 5.0f, 0.0f));
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(0.0f, 155.0f, 0.0f));
     PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Direction", glm::vec3(0.0f, -1.0f, 0.0f));
     PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ka", glm::vec3(0.1f, 0.1f, 0.1f));  // Ambient component
     PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
@@ -636,6 +663,13 @@ int main() {
         ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
         CurrentShader->SetModel(ModelMatrix);
         Cat.Render();
+
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(-20.0f, 1.0f + verticalOffset, 20.0f));
+        ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
+        CurrentShader->SetModel(ModelMatrix);
+        Balloon.Render();
 
         float PitchRadians = glm::radians(State.mCannonState->mPitch);
         float YawRadians = glm::radians(State.mCannonState->mYaw);
