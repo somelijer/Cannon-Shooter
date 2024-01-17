@@ -70,47 +70,47 @@ void handleSphereCollision(Sphere* sphere1, Sphere* sphere2) {
     glm::vec3 collisionNormal = glm::normalize(sphere2->Position - sphere1->Position);
     glm::vec3 relativeVelocity = sphere2->Velocity - sphere1->Velocity;
     float impactSpeed = glm::dot(relativeVelocity, collisionNormal);
+    float penetrationDepth = sphere1->Radius + sphere2->Radius - glm::distance(sphere1->Position, sphere2->Position);
 
+    if (impactSpeed > 0)return;
     std::cout << "Collision detected! ==================" << std::endl;
     std::cout << "Before Collision - Sphere 1: Position(" << sphere1->Position.x << ", " << sphere1->Position.y << ", " << sphere1->Position.z
         << ") Velocity(" << sphere1->Velocity.x << ", " << sphere1->Velocity.y << ", " << sphere1->Velocity.z << ")" << std::endl;
     std::cout << "Before Collision - Sphere 2: Position(" << sphere2->Position.x << ", " << sphere2->Position.y << ", " << sphere2->Position.z
         << ") Velocity(" << sphere2->Velocity.x << ", " << sphere2->Velocity.y << ", " << sphere2->Velocity.z << ")" << std::endl;
+    std::cout << "Penetration: "<< penetrationDepth << std::endl;
+    std::cout << "ImpactSpeed: "<< impactSpeed << std::endl;
+    std::cout << "ColisionNormal: " << collisionNormal.x << ", " << collisionNormal.y << ", " << collisionNormal.z << std::endl;
 
-    if (impactSpeed > 0) {
-        float elasticity = 0.9f; 
-        float reducedMass = 2.0f / (1.0f / sphere1->Mass + 1.0f / sphere2->Mass);
-        glm::vec3 impulse = (1.0f + elasticity) * impactSpeed * collisionNormal * reducedMass;
+    float totalMass = sphere1->Mass + sphere2->Mass;
+    glm::vec3 impulse = (1.0f + elasticity) * impactSpeed * collisionNormal / totalMass;
 
-        sphere1->Velocity += impulse / sphere1->Mass;
-        sphere2->Velocity -= impulse / sphere2->Mass;
+    sphere1->Velocity += impulse * sphere2->Mass;
+    sphere2->Velocity -= impulse * sphere1->Mass;
 
-        float penetrationDepth = sphere1->Radius + sphere2->Radius - glm::distance(sphere1->Position, sphere2->Position);
-        glm::vec3 separationVector = 0.5f * penetrationDepth * collisionNormal;
-
-        sphere1->Position += separationVector;
-        sphere2->Position -= separationVector;
-    }
+    glm::vec3 separationVector = 0.5f * penetrationDepth * collisionNormal;
+    sphere1->Position += separationVector;
+    sphere2->Position -= separationVector;
 
     std::cout << "After Collision - Sphere 1: Position(" << sphere1->Position.x << ", " << sphere1->Position.y << ", " << sphere1->Position.z
         << ") Velocity(" << sphere1->Velocity.x << ", " << sphere1->Velocity.y << ", " << sphere1->Velocity.z << ")" << std::endl;
     std::cout << "After Collision - Sphere 2: Position(" << sphere2->Position.x << ", " << sphere2->Position.y << ", " << sphere2->Position.z
         << ") Velocity(" << sphere2->Velocity.x << ", " << sphere2->Velocity.y << ", " << sphere2->Velocity.z << ")" << std::endl;
+    std::cout << " ===================================" << std::endl << std::endl;
 
 }
 
-void checkConstraints(std::list<Sphere*> sphereList)
+void checkConstraints(std::list<Sphere*>& sphereList)
 {
-    for(Sphere* sphere : sphereList)
-    {
-        float floorHeight = 0.1f;
-        if (sphere->Position.y - sphere->Radius < floorHeight) {
-            sphere->Position.y = floorHeight + sphere->Radius;
-            sphere->Velocity.y *= -1;
-            sphere->Velocity *= 0.8;
-        }
+    for (auto outerSphereIt = sphereList.begin(); outerSphereIt != sphereList.end(); ++outerSphereIt) {
+        Sphere* sphere = *outerSphereIt;
 
-        for (Sphere* otherSphere : sphereList) {
+        FloorConstraint(sphere);
+
+        // Iterate from the position of the outer loop until the end
+        for (auto innerSphereIt = outerSphereIt; innerSphereIt != sphereList.end(); ++innerSphereIt) {
+            Sphere* otherSphere = *innerSphereIt;
+
             if (sphere != otherSphere && areSpheresTouching(*sphere, *otherSphere)) {
                 handleSphereCollision(sphere, otherSphere);
             }
@@ -118,6 +118,15 @@ void checkConstraints(std::list<Sphere*> sphereList)
     }
 
     
+}
+
+void FloorConstraint(Sphere* sphere)
+{
+    if (sphere->Position.y - sphere->Radius < floorHeight) {
+        sphere->Position.y = floorHeight + sphere->Radius;
+        sphere->Velocity.y *= -1;
+        sphere->Velocity *= elasticity;
+    }
 }
 
 void updateSphere(Sphere* sphere,float dt) {

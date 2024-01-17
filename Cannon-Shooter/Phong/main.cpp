@@ -30,7 +30,7 @@ float LastShootTime = glfwGetTime();
 float CannonUpperShootLimit = 60.0f;
 float CannonLowerShootLimit = 5.0f;
 
-bool MovementDebug = true;
+bool MovementDebug = false;
 bool MovementDebugFreeze = true;
 float MovementStep = 1.5F / TargetFPS;
 
@@ -546,12 +546,29 @@ int main() {
         Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(10.0f, pos /2, +5.f + pos /2), glm::vec3(0.0f) };
         SphereList.push_back(sphere);
     }*/
+    {
+        /**/Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, 6.f, -20.2f), glm::vec3(0.0f) };
+        SphereList.push_back(sphere1);
 
+        Sphere* sphere2 = new Sphere{10.0f, 0.4f, glm::vec3(0.0f, 2.f, -20.f), glm::vec3(0.0f,1.0f,0.0f)};
+        SphereList.push_back(sphere2);
+        Sphere* sphere3 = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, 4.f, -19.8f), glm::vec3(0.0f,1.0f,0.0f) };
+        SphereList.push_back(sphere3);
 
+    }
+
+    {
+
+        Sphere* sphere2 = new Sphere{ 10.0f, 0.4f, glm::vec3(3.0f, 2.f, -20.2f), glm::vec3(0.0f,1.0f,0.0f) };
+        SphereList.push_back(sphere2);
+        Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(3.0f, 6.f, -20.f), glm::vec3(0.0f) };
+        SphereList.push_back(sphere1);
+
+    }
+    
     glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 200.0f);
     glm::mat4 View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
     glm::mat4 ModelMatrix(1.0f);
-    
 
     float TargetFrameTime = 1.0f / TargetFPS;
     float StartTime = glfwGetTime();
