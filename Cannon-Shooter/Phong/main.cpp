@@ -326,12 +326,12 @@ int main() {
     #pragma region texture_loading
 
     vector<std::string> faces;
-    faces.push_back("res/images/skybox/right.tga");
-    faces.push_back("res/images/skybox/left.tga");
-    faces.push_back("res/images/skybox/top.tga");
-    faces.push_back("res/images/skybox/bottom.tga");
-    faces.push_back("res/images/skybox/back.tga");
-    faces.push_back("res/images/skybox/front.tga");
+    faces.push_back("res/don.jpeg");
+    faces.push_back("res/don.jpeg");
+    faces.push_back("res/don.jpeg");
+    faces.push_back("res/don.jpeg");
+    faces.push_back("res/don.jpeg");
+    faces.push_back("res/don.jpeg");
     unsigned int cubemapTexture = Texture::LoadCubemap(faces);
 
     unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/don.jpeg");
@@ -504,6 +504,7 @@ int main() {
     Shader ColorShader("shaders/color.vert", "shaders/color.frag");
     Shader SkyboxShader("shaders/skybox.vert", "shaders/skybox.frag");
     Shader PhongShaderMaterialTexture("shaders/basic.vert", "shaders/phong_material_texture.frag");
+
     glUseProgram(PhongShaderMaterialTexture.GetId());
     // Adjust directional light (sun)
     PhongShaderMaterialTexture.SetUniform3f("uDirLight.Direction", glm::vec3(1.0f, -1.0f, 0.0f));
@@ -538,6 +539,10 @@ int main() {
     PhongShaderMaterialTexture.SetUniform1f("uMaterial.Shininess", 70.0f);  // Reduce shininess for a rough surface
     glUseProgram(0);
 
+
+    glUseProgram(SkyboxShader.GetId());
+    SkyboxShader.SetUniform1i("skybox", 0);
+    glUseProgram(0);
     #pragma endregion
 
 
@@ -555,9 +560,9 @@ int main() {
         float pos = static_cast<float>(i/3 );
         Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(10.0f, pos /2, +5.f + pos /2), glm::vec3(0.0f) };
         SphereList.push_back(sphere);
-    }*/
+    }
     {
-        /**/Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, 6.f, -20.2f), glm::vec3(0.0f) };
+        Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, 6.f, -20.2f), glm::vec3(0.0f) };
         SphereList.push_back(sphere1);
 
         Sphere* sphere2 = new Sphere{10.0f, 0.4f, glm::vec3(0.0f, 2.f, -20.f), glm::vec3(0.0f,1.0f,0.0f)};
@@ -574,7 +579,7 @@ int main() {
         Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(3.0f, 6.f, -20.f), glm::vec3(0.0f) };
         SphereList.push_back(sphere1);
 
-    }
+    }*/
     
     glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 200.0f);
     glm::mat4 View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
@@ -606,24 +611,6 @@ int main() {
         
 
 
-        #pragma region skybox
-
-        glDepthFunc(GL_LEQUAL); 
-        glBindVertexArray(skyboxVAO);
-        glUseProgram(SkyboxShader.GetId());
-        ModelMatrix = glm::mat4(1.0f);
-        SkyboxShader.SetProjection(Projection);
-        SkyboxShader.SetView(glm::mat4(glm::mat3(View)));
-        SkyboxShader.SetUniform3f("uViewPos", FPSCamera.GetPosition());
-        SkyboxShader.SetModel(ModelMatrix);
-        glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, CubeDiffuseTexture);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-        glDepthFunc(GL_LESS);
-
-        #pragma endregion
 
         glUseProgram(CurrentShader->GetId());
         CurrentShader->SetProjection(Projection);
@@ -725,38 +712,25 @@ int main() {
         AddPalms(ModelMatrix, CurrentShader, Palm);
         DrawFloor(CubeVAO, *CurrentShader, FloorTexture1);
 
-        glDepthFunc(GL_LEQUAL);
-        glUseProgram(SkyboxShader.GetId());
-        glm::vec3 PointLightPosition(0.0f, 25.0f, 0.0f);
-        SkyboxShader.SetUniform3f("uPointLight.Position", PointLightPosition);
-        SkyboxShader.SetProjection(Projection);
-        SkyboxShader.SetView(View);
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, 1.0f, 0.0f));
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(50.0f));
-        SkyboxShader.SetModel(ModelMatrix);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, CubeSpecularTexture);
-        glBindVertexArray(skyboxVAO);
-        glDrawArrays(GL_TRIANGLES, 0, CubeVertices.size() / 8);
-        glBindVertexArray(0);
-        glDepthFunc(GL_LESS);
+
+        #pragma endregion
+        
+        #pragma region skybox
 
         glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
         glUseProgram(SkyboxShader.GetId());
         View = glm::mat4(glm::mat3(View)); // remove translation from the view matrix
-        //SkyboxShader.setMat4("view", View);
-        //SkyboxShader.setMat4("projection", Projection);
-        // skybox cube
+        SkyboxShader.SetView(View);
+        SkyboxShader.SetProjection(Projection);
         glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
         glDepthFunc(GL_LESS);
+        glUseProgram(0);
 
         #pragma endregion
-        
         
 
 

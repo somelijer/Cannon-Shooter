@@ -18,5 +18,5 @@ public:
 	 * @returns TextureID
 	 */
 	static unsigned LoadImageToTexture(const std::string& filePath);
-	static unsigned LoadCubemap(std::vector<std::string>& filePaths);
+	static unsigned LoadCubemap(std::vector<std::string> filePaths);
 };
