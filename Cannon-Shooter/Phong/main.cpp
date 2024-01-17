@@ -34,6 +34,11 @@ bool MovementDebug = false;
 bool MovementDebugFreeze = true;
 float MovementStep = 1.5F / TargetFPS;
 
+float CannonError = 0.01f;
+std::random_device rd;
+std::mt19937 gen(rd());
+std::uniform_real_distribution<float> CannonErrorDistribution(-CannonError, CannonError);
+
 struct Input {
     bool MoveLeft;
     bool MoveRight;
@@ -145,9 +150,16 @@ void UpdateCannon(float deltaX, float deltaY,CannonState* state) {
 }
 
 void ShootBall(EngineState* state) {
+
+    glm::vec3 shootvector = state->mCannonState->mForwardVector;
+    shootvector.x += CannonErrorDistribution(gen);
+    shootvector.y += CannonErrorDistribution(gen);
+    shootvector.z += CannonErrorDistribution(gen);
+
+
     if (glfwGetTime() - LastShootTime > 0.5) {
         float speed = 5.0f;
-        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, state->mCannonState->mForwardVector * state->mCannonState->mStrenght };
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, shootvector * state->mCannonState->mStrenght };
         SphereList.push_back(sphere);
         LastShootTime = glfwGetTime();
     }
@@ -528,8 +540,6 @@ int main() {
 
     #pragma endregion
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
 
     // Define the range
     std::uniform_real_distribution<float> dis(-10.0f, 10.0f);
