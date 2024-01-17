@@ -1,4 +1,5 @@
 #include <glm/ext/vector_float3.hpp>
+#include <list>
 #ifndef PHYSICS_HPP
 #define PHYSICS_HPP
 
@@ -12,8 +13,9 @@ struct Sphere {
     glm::vec3 Velocity;
 };
 
-void CheckConstraints(Sphere* sphere);
+void checkConstraints(std::list<Sphere*> sphereList);
 
 void updateSphere(Sphere* sphere, float dt);
+
 
 #endif // PHYSICS_HPP

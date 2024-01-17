@@ -2,6 +2,7 @@
 #include <glm/geometric.hpp>
 #include "physics.hpp"
 #include <functional>
+#include <iostream>
 
 
 void rk4Step(glm::vec3& position, glm::vec3& velocity,
@@ -59,15 +60,64 @@ glm::vec3 calculateDragForce(const glm::vec3& speed, double dragConst) {
     return ret;
 }
 
+bool areSpheresTouching(const Sphere& sphere1, const Sphere& sphere2) {
+    float distance = glm::distance(sphere1.Position, sphere2.Position);
+    float sumRadii = sphere1.Radius + sphere2.Radius;
+    return distance < sumRadii;
+}
 
-void CheckConstraints(Sphere* sphere)
-{
-    float floorHeight = 0.1f;
-    if (sphere->Position.y - sphere->Radius < floorHeight) {
-        sphere->Position.y = floorHeight + sphere->Radius;
-        sphere->Velocity.y *= -1;
-        sphere->Velocity *= 0.8;
+void handleSphereCollision(Sphere* sphere1, Sphere* sphere2) {
+    glm::vec3 collisionNormal = glm::normalize(sphere2->Position - sphere1->Position);
+    glm::vec3 relativeVelocity = sphere2->Velocity - sphere1->Velocity;
+    float impactSpeed = glm::dot(relativeVelocity, collisionNormal);
+
+    std::cout << "Collision detected! ==================" << std::endl;
+    std::cout << "Before Collision - Sphere 1: Position(" << sphere1->Position.x << ", " << sphere1->Position.y << ", " << sphere1->Position.z
+        << ") Velocity(" << sphere1->Velocity.x << ", " << sphere1->Velocity.y << ", " << sphere1->Velocity.z << ")" << std::endl;
+    std::cout << "Before Collision - Sphere 2: Position(" << sphere2->Position.x << ", " << sphere2->Position.y << ", " << sphere2->Position.z
+        << ") Velocity(" << sphere2->Velocity.x << ", " << sphere2->Velocity.y << ", " << sphere2->Velocity.z << ")" << std::endl;
+
+    if (impactSpeed > 0) {
+        float elasticity = 0.9f; 
+        float reducedMass = 2.0f / (1.0f / sphere1->Mass + 1.0f / sphere2->Mass);
+        glm::vec3 impulse = (1.0f + elasticity) * impactSpeed * collisionNormal * reducedMass;
+
+        sphere1->Velocity += impulse / sphere1->Mass;
+        sphere2->Velocity -= impulse / sphere2->Mass;
+
+        float penetrationDepth = sphere1->Radius + sphere2->Radius - glm::distance(sphere1->Position, sphere2->Position);
+        glm::vec3 separationVector = 0.5f * penetrationDepth * collisionNormal;
+
+        sphere1->Position += separationVector;
+        sphere2->Position -= separationVector;
     }
+
+    std::cout << "After Collision - Sphere 1: Position(" << sphere1->Position.x << ", " << sphere1->Position.y << ", " << sphere1->Position.z
+        << ") Velocity(" << sphere1->Velocity.x << ", " << sphere1->Velocity.y << ", " << sphere1->Velocity.z << ")" << std::endl;
+    std::cout << "After Collision - Sphere 2: Position(" << sphere2->Position.x << ", " << sphere2->Position.y << ", " << sphere2->Position.z
+        << ") Velocity(" << sphere2->Velocity.x << ", " << sphere2->Velocity.y << ", " << sphere2->Velocity.z << ")" << std::endl;
+
+}
+
+void checkConstraints(std::list<Sphere*> sphereList)
+{
+    for(Sphere* sphere : sphereList)
+    {
+        float floorHeight = 0.1f;
+        if (sphere->Position.y - sphere->Radius < floorHeight) {
+            sphere->Position.y = floorHeight + sphere->Radius;
+            sphere->Velocity.y *= -1;
+            sphere->Velocity *= 0.8;
+        }
+
+        for (Sphere* otherSphere : sphereList) {
+            if (sphere != otherSphere && areSpheresTouching(*sphere, *otherSphere)) {
+                handleSphereCollision(sphere, otherSphere);
+            }
+        }
+    }
+
+    
 }
 
 void updateSphere(Sphere* sphere,float dt) {
@@ -96,7 +146,6 @@ void updateSphere(Sphere* sphere,float dt) {
         return f_rez.z / float(mass);
         };
 
-    CheckConstraints(sphere);
 
     rk4Step(sphere->Position, sphere->Velocity, accelerationX, accelerationY, accelerationZ, dt);
 }

@@ -27,6 +27,12 @@ double lastX = 90;
 double lastY = 90;
 list<Sphere*> SphereList;
 float LastShootTime = glfwGetTime();
+float CannonUpperShootLimit = 60.0f;
+float CannonLowerShootLimit = 5.0f;
+
+bool MovementDebug = true;
+bool MovementDebugFreeze = true;
+float MovementStep = 1.5F / TargetFPS;
 
 struct Input {
     bool MoveLeft;
@@ -40,6 +46,8 @@ struct Input {
     bool CannonUp;
     bool CannonDown;
     bool ShootCannon;
+    bool CannonUpStrenght;
+    bool CannonDownStrenght;
 };
 
 struct CannonState {
@@ -47,6 +55,7 @@ struct CannonState {
     float mYaw;
     glm::vec3 mBarrelEnd;
     glm::vec3 mForwardVector;
+    float mStrenght;
 };
 
 
@@ -80,9 +89,21 @@ KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     case GLFW_KEY_UP: UserInput->CannonUp = IsDown; break;
     case GLFW_KEY_DOWN: UserInput->CannonDown = IsDown; break;
     case GLFW_KEY_ENTER: UserInput->ShootCannon = IsDown; break;
-
+    case GLFW_KEY_KP_ADD: UserInput->CannonUpStrenght = IsDown; break;
+    case GLFW_KEY_KP_SUBTRACT: UserInput->CannonDownStrenght = IsDown; break;
+    case GLFW_KEY_F: MovementDebugFreeze = IsDown; break;
+  
     case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
     }
+
+}
+
+bool IsFreezed() {
+    if (!MovementDebugFreeze) {
+        MovementDebugFreeze = true;
+        return false;
+    }
+    return true;
 }
 
 static void
@@ -125,11 +146,16 @@ void UpdateCannon(float deltaX, float deltaY,CannonState* state) {
 
 void ShootBall(EngineState* state) {
     if (glfwGetTime() - LastShootTime > 0.5) {
-        float speed = 20.0f;
-        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, state->mCannonState->mForwardVector * speed };
+        float speed = 5.0f;
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, state->mCannonState->mForwardVector * state->mCannonState->mStrenght };
         SphereList.push_back(sphere);
         LastShootTime = glfwGetTime();
     }
+}
+
+void UpdateCannonStrenght(EngineState* state,float delta) {
+    if (state->mCannonState->mStrenght + delta > CannonUpperShootLimit || state->mCannonState->mStrenght + delta < CannonLowerShootLimit) return;
+    state->mCannonState->mStrenght += delta;
 }
 
 static void
@@ -147,7 +173,9 @@ HandleInput(EngineState* state) {
     if (UserInput->CannonRight) UpdateCannon(-1.0f, 0.0f, state->mCannonState);
     if (UserInput->CannonDown) UpdateCannon(0.0f, -1.0f, state->mCannonState);
     if (UserInput->CannonUp) UpdateCannon(0.0f, 1.0f, state->mCannonState);
-    if (UserInput->ShootCannon) ShootBall(state );
+    if (UserInput->ShootCannon) ShootBall(state);
+    if (UserInput->CannonUpStrenght) UpdateCannonStrenght(state,1.0f);
+    if (UserInput->CannonDownStrenght) UpdateCannonStrenght(state,-1.0f);
 }
 
 
@@ -159,7 +187,7 @@ DrawFloor(unsigned vao, const Shader& shader, unsigned texture) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, NULL);
+    glBindTexture(GL_TEXTURE_2D, texture);
     float Size = 15.0f;
     for (int i = -8; i < 16; ++i) {
         for (int j = -8; j < 16; ++j) {
@@ -267,8 +295,9 @@ int main() {
     State.mCamera = &FPSCamera;
     State.mInput = &UserInput;
     CannonState cannonInfo;
-    cannonInfo.mPitch = 90.0f;
+    cannonInfo.mPitch = 0.0f;
     cannonInfo.mYaw = 0.0f;
+    cannonInfo.mStrenght = 10.0f;
     State.mCannonState = &cannonInfo;
     glfwSetWindowUserPointer(Window, &State);
 
@@ -506,14 +535,20 @@ int main() {
     std::uniform_real_distribution<float> dis(-10.0f, 10.0f);
 
     
-    for (int i = 1; i < 15; i++) {
+    /*for (int i = 1; i < 15; i++) {
         float pos = static_cast<float>(i * 3);
         Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, dis(gen) + 10.0f , -30.0f + dis(gen)/2), glm::vec3(dis(gen), dis(gen), dis(gen)) };
         SphereList.push_back(sphere);
     }
 
+    for (int i = 1; i < 15; i++) {
+        float pos = static_cast<float>(i/3 );
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(10.0f, pos /2, +5.f + pos /2), glm::vec3(0.0f) };
+        SphereList.push_back(sphere);
+    }*/
 
-    glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
+
+    glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 200.0f);
     glm::mat4 View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
     glm::mat4 ModelMatrix(1.0f);
     
@@ -527,7 +562,7 @@ int main() {
     float CatRotationAngle = glm::radians(45.0f);
     float CatVerticalMotionAmplitude = 4.0f; 
     float CatVerticalMotionFrequency = 1.0f;
-    glm::vec3 CannonPos = glm::vec3(5.0f, 0.8f, 0.0f);
+    glm::vec3 CannonPos = glm::vec3(5.0f, 1.8f, 0.0f);
 
     
     Shader* CurrentShader = &PhongShaderMaterialTexture;
@@ -623,15 +658,37 @@ int main() {
         CurrentShader->SetModel(ModelMatrix);
         Beachball.Render();
         
-        for (auto sphere : SphereList) {
-            float scaling = sphere->Radius/0.2f;
-            ModelMatrix = glm::mat4(1.0f);
-            ModelMatrix = glm::translate(ModelMatrix, sphere->Position);
-            ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
-            CurrentShader->SetModel(ModelMatrix);
-            Beachball.Render();
-            updateSphere(sphere, State.mDT);
+        if (MovementDebug) {
+
+            bool freezed = IsFreezed();
+            for (auto sphere : SphereList) {
+                float scaling = sphere->Radius / 0.2f;
+                ModelMatrix = glm::mat4(1.0f);
+                ModelMatrix = glm::translate(ModelMatrix, sphere->Position);
+                ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+                CurrentShader->SetModel(ModelMatrix);
+                Beachball.Render();
+
+                if(!freezed)updateSphere(sphere, MovementStep);
+            }
+
+            if (!freezed)checkConstraints(SphereList);
         }
+        else {
+
+            for (auto sphere : SphereList) {
+                float scaling = sphere->Radius / 0.2f;
+                ModelMatrix = glm::mat4(1.0f);
+                ModelMatrix = glm::translate(ModelMatrix, sphere->Position);
+                ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+                CurrentShader->SetModel(ModelMatrix);
+                Beachball.Render();
+                updateSphere(sphere, State.mDT);
+            }
+
+            checkConstraints(SphereList);
+        }
+     
 
         #pragma endregion
 
@@ -679,6 +736,18 @@ int main() {
         glBindVertexArray(0);
         glUseProgram(0);
         glfwSwapBuffers(Window);
+
+        if (true) {
+            EndTime = glfwGetTime();
+            float WorkTime = EndTime - StartTime;
+            if (WorkTime < TargetFrameTime) {
+                int DeltaMS = (int)((TargetFrameTime - WorkTime) * 1000.0f);
+                std::this_thread::sleep_for(std::chrono::milliseconds(DeltaMS));
+                EndTime = glfwGetTime();
+            }
+            State.mDT = TargetFrameTime;
+            continue;
+        }
 
         // NOTE(Jovan): Time management
         EndTime = glfwGetTime();
