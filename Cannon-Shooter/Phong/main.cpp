@@ -325,14 +325,20 @@ int main() {
 
     #pragma region texture_loading
 
-    vector<std::string> faces;
-    faces.push_back("res/don.jpeg");
-    faces.push_back("res/don.jpeg");
-    faces.push_back("res/don.jpeg");
-    faces.push_back("res/don.jpeg");
-    faces.push_back("res/don.jpeg");
-    faces.push_back("res/don.jpeg");
+    vector<std::string> faces
+    {
+        "res/skybox/face_1.png",
+        "res/skybox/face_2.png",
+        "res/skybox/face_3.png",
+        "res/skybox/face_4.png",
+        "res/skybox/face_5.png",
+        "res/skybox/face_6.png"
+    };
     unsigned int cubemapTexture = Texture::LoadCubemap(faces);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        std::cout << "OpenGL Error: " << error << std::endl;
+    }
 
     unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/don.jpeg");
     unsigned CubeSpecularTexture = Texture::LoadImageToTexture("res/container_specular.png");
@@ -501,8 +507,13 @@ int main() {
 
     #pragma region light_and_shader_setup
 
-    Shader ColorShader("shaders/color.vert", "shaders/color.frag");
     Shader SkyboxShader("shaders/skybox.vert", "shaders/skybox.frag");
+
+
+    glUseProgram(SkyboxShader.GetId());
+    SkyboxShader.SetUniform1i("skybox", 0);
+    glUseProgram(0);
+
     Shader PhongShaderMaterialTexture("shaders/basic.vert", "shaders/phong_material_texture.frag");
 
     glUseProgram(PhongShaderMaterialTexture.GetId());
@@ -540,9 +551,6 @@ int main() {
     glUseProgram(0);
 
 
-    glUseProgram(SkyboxShader.GetId());
-    SkyboxShader.SetUniform1i("skybox", 0);
-    glUseProgram(0);
     #pragma endregion
 
 
@@ -738,7 +746,7 @@ int main() {
         glUseProgram(0);
         glfwSwapBuffers(Window);
 
-        if (true) {
+        if (MovementDebug) {
             EndTime = glfwGetTime();
             float WorkTime = EndTime - StartTime;
             if (WorkTime < TargetFrameTime) {
