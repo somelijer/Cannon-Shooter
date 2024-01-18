@@ -28,6 +28,7 @@ double lastY = 90;
 list<Sphere*> SphereList;
 list<Plane*> PlaneList;
 list<Cylinder*> CylinderList;
+list<glm::vec3> PalmPositionsList;
 float LastShootTime = glfwGetTime();
 float CannonUpperShootLimit = 60.0f;
 float CannonLowerShootLimit = 5.0f;
@@ -226,23 +227,24 @@ void RenderPalmAt(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm, gl
     Palm.Render();
 }
 
-void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
+void AddPalmLocations()
 {
     float x = 40.0f;
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, x));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, -x));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, x));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, -x));
+    PalmPositionsList.push_back(glm::vec3(x, 0.0f, x));
+    PalmPositionsList.push_back(glm::vec3(x, 0.0f, -x));
+    PalmPositionsList.push_back(glm::vec3(-x, 0.0f, x));
+    PalmPositionsList.push_back(glm::vec3(-x, 0.0f, -x));
 
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x / 2, 0.0f, x));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x / 2, 0.0f, -x));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x / 2, 0.0f, x));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x / 2, 0.0f, -x));
+    PalmPositionsList.push_back(glm::vec3(x, 0.0f, x / 2));
+    PalmPositionsList.push_back(glm::vec3(x, 0.0f, -x / 2));
+    PalmPositionsList.push_back(glm::vec3(-x, 0.0f, x / 2));
+    PalmPositionsList.push_back(glm::vec3(-x, 0.0f, -x / 2));
 
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, x / 2));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, -x / 2));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, x / 2));
-    RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(-x, 0.0f, -x / 2));
+    PalmPositionsList.push_back(glm::vec3(x / 2, 0.0f, x));
+    PalmPositionsList.push_back(glm::vec3(x / 2, 0.0f, -x));
+    PalmPositionsList.push_back(glm::vec3(-x / 2, 0.0f, x));
+    PalmPositionsList.push_back(glm::vec3(-x / 2, 0.0f, -x));
+
 
     float spacing = 60.0f;
 
@@ -251,7 +253,7 @@ void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
         float radians = glm::radians(angle);
         float x = glm::cos(radians) * spacing;
         float z = glm::sin(radians) * spacing;
-        RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, z));
+        PalmPositionsList.push_back(glm::vec3(x, 0.0f, z));
     }
 
     spacing = 90.0f;
@@ -261,7 +263,20 @@ void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
         float radians = glm::radians(angle);
         float x = glm::cos(radians) * spacing;
         float z = glm::sin(radians) * spacing;
-        RenderPalmAt(ModelMatrix, CurrentShader, Palm, glm::vec3(x, 0.0f, z));
+        PalmPositionsList.push_back(glm::vec3(x, 0.0f, z));
+    }
+
+    for (glm::vec3 pos : PalmPositionsList) {
+        glm::vec3 CylPos1 = glm::vec3(pos.x - 0.0f, 20.0f, pos.z - 0.8f);
+        glm::vec3 CylPos2 = glm::vec3(pos.x, 0.0f, pos.z);
+        CylinderList.push_back(new Cylinder{ 1.0f, CylPos1 , CylPos2 });
+    }
+}
+
+void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
+{
+    for (glm::vec3 pos : PalmPositionsList) {
+        RenderPalmAt(ModelMatrix, CurrentShader, Palm, pos);
     }
 }
 
@@ -361,6 +376,7 @@ int main() {
     if (error != GL_NO_ERROR) {
         std::cout << "OpenGL Error: " << error << std::endl;
     }
+
 
     unsigned CubeDiffuseTexture = Texture::LoadImageToTexture("res/don.jpeg");
     unsigned CubeSpecularTexture = Texture::LoadImageToTexture("res/container_specular.png");
@@ -532,6 +548,9 @@ int main() {
         glfwTerminate();
         return -1;
     }
+
+    AddPalmLocations();
+
     #pragma endregion
 
     #pragma region light_and_shader_setup
@@ -636,9 +655,7 @@ int main() {
     PlaneList.push_back(new Plane{ glm::vec3(0.0f, 1.0f, 0.0f), 0.1f });
     PlaneList.push_back(new Plane{ glm::vec3(1.0f, 1.0f, 0.0f), -20.1f });
 
-    glm::vec3 CylPos1 = glm::vec3(20.0f, 1.0f, 2.0f);
-    glm::vec3 CylPos2 = glm::vec3(20.0f, 5.0f, 0.0f);
-    CylinderList.push_back(new Cylinder{ 1.0f, CylPos1 , CylPos2 });
+    
 
     
     Shader* CurrentShader = &PhongShaderMaterialTexture;
@@ -724,19 +741,7 @@ int main() {
         Beachball.Render();
         
 
-        scaling = 1.0f / 0.2f;
 
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, CylPos1);
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
-        CurrentShader->SetModel(ModelMatrix);
-        Beachball.Render();
-
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, CylPos2);
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
-        CurrentShader->SetModel(ModelMatrix);
-        Beachball.Render();
 
         if (MovementDebug) {
 
