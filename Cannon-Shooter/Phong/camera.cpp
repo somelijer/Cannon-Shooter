@@ -1,7 +1,7 @@
 #include "camera.hpp"
 
 Camera::Camera() {
-    mPosition = glm::vec3(0.0f, 0.0f, 2.0f);
+    mPosition = glm::vec3(-12.0f, 0.0f, 0.0f);
     mWorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
     mRight = glm::vec3(1.0f, 0.0f, 0.0f);
     mVelocity = glm::vec3(0.0f);
@@ -9,7 +9,7 @@ Camera::Camera() {
     mYaw = -90.0f;
     mMoveSpeed = 8.0f;
     mLookSpeed = 64.0f;
-    mPlayerHeight = 2.0f;
+    mPlayerHeight = 5.0f;
     updateVectors();
 }
 

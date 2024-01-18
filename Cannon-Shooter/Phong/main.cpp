@@ -133,21 +133,18 @@ FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
 
 static void
 mouseCallback(GLFWwindow* window, double xPos, double yPos) {
-    // Calculate the change in mouse position
     float deltaX = xPos - lastX;
-    float deltaY = lastY - yPos;  // Reversed since y-coordinates go from bottom to top
+    float deltaY = lastY - yPos;  
 
     EngineState* State = (EngineState*)glfwGetWindowUserPointer(window);
     Camera* mCamera = State->mCamera;
 
-    // Update camera orientation (adjust these parameters based on your needs)
     float sensitivity = 0.2f;
     deltaX *= sensitivity;
     deltaY *= sensitivity;
 
     mCamera->UpdateOrientation(deltaX, deltaY);
 
-    // Save current mouse position for the next frame
     lastX = xPos;
     lastY = yPos;
 }
@@ -258,7 +255,6 @@ void AddPalmLocations()
 
     float spacing = 60.0f;
 
-    // Add palms in a circular pattern around the map
     for (float angle = 0.0f; angle < 360.0f; angle += 23.5f) {
         float radians = glm::radians(angle);
         float x = glm::cos(radians) * spacing;
@@ -268,7 +264,6 @@ void AddPalmLocations()
 
     spacing = 90.0f;
 
-    // Add palms in a circular pattern around the map
     for (float angle = 12.0f; angle < 382.0f; angle += 16.8f) {
         float radians = glm::radians(angle);
         float x = glm::cos(radians) * spacing;
@@ -367,7 +362,7 @@ void checkBalloonHit(Sphere* sphere,float balloonRadius, glm::vec3 ballonPosWith
         balloonPos = glm::vec3(BalloonPositionDistribution(gen), BalloonPositionDistribution(gen)  - 8.f, BalloonPositionDistribution(gen));
         PlayerScore += 1;
         std::cout << "Balloon popped! Player Score: " << PlayerScore << std::endl << std::endl;
-        if (PlayerScore % 2 == 0) {
+        if (PlayerScore % 1 == 0) {
             CatRotationAngle = glm::radians(-3.1419f);
             CatAnimationActive = true;
         }
@@ -375,9 +370,9 @@ void checkBalloonHit(Sphere* sphere,float balloonRadius, glm::vec3 ballonPosWith
 
 }
 
-void DoCatCelebration(float& CatRotationAngle, EngineState& State, float CatVerticalMotionAmplitude, glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Cat)
+void DoCatCelebration(float& CatRotationAngle, EngineState& State, float CatVerticalMotionAmplitude, glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Cat,glm::vec3 CannonPos)
 {
-    glm::vec3 CannonPos = glm::vec3(5.0f, 1.8f, 0.0f);
+
     CatRotationAngle += State.mDT * 8;
     float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
 
@@ -695,7 +690,7 @@ int main() {
     float BalloonVerticalMotionAmplitude = 1.0f;
     float BalloonVerticalMotionFrequency = 0.5f;
 
-    glm::vec3 CannonPos = glm::vec3(5.0f, 1.8f, 0.0f);
+    glm::vec3 CannonPos = glm::vec3(5.0f, 3.2f, 0.0f);
 
     PlaneList.push_back(new Plane{ glm::vec3(0.0f, 1.0f, 0.0f), 0.1f });
 
@@ -729,7 +724,7 @@ int main() {
         float balloonVerticalOffset = BalloonVerticalMotionAmplitude * sin(BalloonRotationAngle / 2);
 
         if (CatAnimationActive) {
-            DoCatCelebration(CatRotationAngle, State, CatVerticalMotionAmplitude, ModelMatrix, CurrentShader, Cat);
+            DoCatCelebration(CatRotationAngle, State, CatVerticalMotionAmplitude, ModelMatrix, CurrentShader, Cat,CannonPos);
         }
 
 

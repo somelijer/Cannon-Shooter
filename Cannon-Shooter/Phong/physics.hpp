@@ -31,4 +31,7 @@ void checkConstraints(std::list<Sphere*>& sphereList, std::list<Plane*>& planeLi
 void updateSphere(Sphere* sphere, float dt);
 
 
-#endif // PHYSICS_HPP
+#endif 
+
+
+PHYSICS_HPP

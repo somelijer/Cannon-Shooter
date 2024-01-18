@@ -72,6 +72,7 @@ private:
     float mLookSpeed;
     float mPitch;
     float mYaw;
-    float mPlayerHeight; // Should be moved out
+    float mPlayerHeight; 
+    
     void updateVectors();
 };
