@@ -25,6 +25,7 @@ const float TargetFPS = 60.0f;
 const std::string WindowTitle = "Cannon Shooter";
 double lastX = 90;
 double lastY = 90;
+int PlayerScore = 0;
 list<Sphere*> SphereList;
 list<Plane*> PlaneList;
 list<Cylinder*> CylinderList;
@@ -38,9 +39,13 @@ bool MovementDebugFreeze = true;
 float MovementStep = 1.5F / TargetFPS;
 
 float CannonError = 0.01f;
+
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_real_distribution<float> CannonErrorDistribution(-CannonError, CannonError);
+std::uniform_real_distribution<float> BalloonPositionDistribution(10.0f, 30.0f);
+
+glm::vec3 balloonPos;
 
 struct Input {
     bool MoveLeft;
@@ -269,7 +274,7 @@ void AddPalmLocations()
     for (glm::vec3 pos : PalmPositionsList) {
         glm::vec3 CylPos1 = glm::vec3(pos.x - 0.0f, 20.0f, pos.z - 0.8f);
         glm::vec3 CylPos2 = glm::vec3(pos.x, 0.0f, pos.z);
-        CylinderList.push_back(new Cylinder{ 1.0f, CylPos1 , CylPos2 });
+        CylinderList.push_back(new Cylinder{ 0.5f, CylPos1 , CylPos2 });
     }
 }
 
@@ -280,6 +285,40 @@ void AddPalms(glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Palm)
     }
 }
 
+void SetupPhongLight(Shader PhongShaderMaterialTexture)
+{
+    // Adjust directional light (sun)
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Direction", glm::vec3(1.0f, -1.0f, 0.5f));
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ka", glm::vec3(0.8f, 0.8f, 0.6f));  // Warm ambient color
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Kd", glm::vec3(0.9f, 0.9f, 0.7f));  // Diffuse color
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular color
+
+    // Adjust point light (simulating a distant light source)
+    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ka", glm::vec3(0.2f, 0.2f, 0.2f));  // Ambient component
+    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
+    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
+    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kc", 1.0f);
+    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kl", 0.092f);
+    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kq", 0.032f);
+
+    // Adjust spotlight (simulating the sun casting shadows)
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(100.0f, 100.0f, 50.5f));
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Direction", glm::vec3(0.0f, -1.0f, 0.0f));
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ka", glm::vec3(0.1f, 0.1f, 0.1f));  // Ambient component
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kc", 1.0f);
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kl", 0.092f);
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kq", 0.032f);
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.InnerCutOff", glm::cos(glm::radians(5.0f)));
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.OuterCutOff", glm::cos(glm::radians(15.0f)));
+
+
+    // Adjust material properties for a sandy appearance
+    PhongShaderMaterialTexture.SetUniform1i("uMaterial.Kd", 0);
+    PhongShaderMaterialTexture.SetUniform1i("uMaterial.Ks", 1);
+    PhongShaderMaterialTexture.SetUniform1f("uMaterial.Shininess", 70.0f);  // Reduce shininess for a rough surface
+}
 
 
 unsigned int loadCubemap(vector<std::string> faces)
@@ -310,6 +349,21 @@ unsigned int loadCubemap(vector<std::string> faces)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
+}
+
+void checkBalloonHit(Sphere* sphere,float balloonRadius, glm::vec3 ballonPosWithAmpl)
+{
+    glm::vec3 balloonCenterPos = ballonPosWithAmpl + glm::vec3(0.0f, 1.3f, 0.0f);
+
+    float distance = glm::distance(sphere->Position, balloonCenterPos);
+
+
+    if (distance < sphere->Radius + balloonRadius) {
+        balloonPos = glm::vec3(BalloonPositionDistribution(gen), BalloonPositionDistribution(gen)  - 8.f, BalloonPositionDistribution(gen));
+        PlayerScore += 1;
+        std::cout << "Balloon popped! Player Score: " << PlayerScore << std::endl << std::endl;
+    }
+
 }
 
 int main() {
@@ -390,6 +444,27 @@ int main() {
     #pragma endregion 
 
     #pragma region cube_setup
+
+    float indicatorVertices[] = {
+    -0.9f, -0.5f,
+    -0.9f,  0.5f,
+    -0.8f,  0.5f,
+    -0.8f, -0.5f,
+    };
+
+    unsigned int indicatorVBO, indicatorVAO;
+    glGenVertexArrays(1, &indicatorVAO);
+    glGenBuffers(1, &indicatorVBO);
+
+    glBindVertexArray(indicatorVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, indicatorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(indicatorVertices), indicatorVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+
     std::vector<float> CubeVertices = {
         // X     Y     Z     NX    NY    NZ    U     V    FRONT SIDE
         -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // L D
@@ -509,6 +584,8 @@ int main() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
+
+
     #pragma endregion
 
     #pragma region model_load
@@ -565,37 +642,11 @@ int main() {
     Shader PhongShaderMaterialTexture("shaders/basic.vert", "shaders/phong_material_texture.frag");
 
     glUseProgram(PhongShaderMaterialTexture.GetId());
-    // Adjust directional light (sun)
-    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Direction", glm::vec3(1.0f, -1.0f, 0.5f));
-    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ka", glm::vec3(0.8f, 0.8f, 0.6f));  // Warm ambient color
-    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Kd", glm::vec3(0.9f, 0.9f, 0.7f));  // Diffuse color
-    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular color
-
-    // Adjust point light (simulating a distant light source)
-    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ka", glm::vec3(0.2f, 0.2f, 0.2f));  // Ambient component
-    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
-    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
-    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kc", 1.0f);
-    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kl", 0.092f);
-    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kq", 0.032f);
-
-    // Adjust spotlight (simulating the sun casting shadows)
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(100.0f, 100.0f, 50.5f));
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Direction", glm::vec3(0.0f, -1.0f, 0.0f));
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ka", glm::vec3(0.1f, 0.1f, 0.1f));  // Ambient component
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
-    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kc", 1.0f);
-    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kl", 0.092f);
-    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kq", 0.032f);
-    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.InnerCutOff", glm::cos(glm::radians(5.0f)));
-    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.OuterCutOff", glm::cos(glm::radians(15.0f)));
-
-
-    // Adjust material properties for a sandy appearance
-    PhongShaderMaterialTexture.SetUniform1i("uMaterial.Kd", 0);
-    PhongShaderMaterialTexture.SetUniform1i("uMaterial.Ks", 1);
-    PhongShaderMaterialTexture.SetUniform1f("uMaterial.Shininess", 70.0f);  // Reduce shininess for a rough surface
+    SetupPhongLight(PhongShaderMaterialTexture);
+    glUseProgram(0);
+    
+    
+    Shader Color2dShader("shaders/2dcolor.vert", "shaders/2dcolor.frag");
     glUseProgram(0);
 
 
@@ -650,10 +701,16 @@ int main() {
     float CatRotationAngle = glm::radians(45.0f);
     float CatVerticalMotionAmplitude = 4.0f; 
     float CatVerticalMotionFrequency = 1.0f;
+
+    float BalloonRotationAngle = glm::radians(45.0f);
+    float BalloonVerticalMotionAmplitude = 1.0f;
+    float BalloonVerticalMotionFrequency = 0.5f;
+
     glm::vec3 CannonPos = glm::vec3(5.0f, 1.8f, 0.0f);
 
     PlaneList.push_back(new Plane{ glm::vec3(0.0f, 1.0f, 0.0f), 0.1f });
-    PlaneList.push_back(new Plane{ glm::vec3(1.0f, 1.0f, 0.0f), -20.1f });
+
+    balloonPos =  glm::vec3(10.0f, 1.8f, -10.0f);
 
     
 
@@ -682,7 +739,11 @@ int main() {
         #pragma region dynamic_elements_draw
 
         CatRotationAngle += State.mDT * 8;
-        /**/float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
+        float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
+
+        BalloonRotationAngle += State.mDT * 4;
+        float balloonVerticalOffset = BalloonVerticalMotionAmplitude * sin(BalloonRotationAngle / 2);
+
         ModelMatrix = glm::mat4(1.0f);
         ModelMatrix = glm::translate(ModelMatrix, glm::vec3(20.0f, 1.0f + verticalOffset, 20.0f));
         ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -690,12 +751,18 @@ int main() {
         CurrentShader->SetModel(ModelMatrix);
         Cat.Render();
 
+
+
+        glm::vec3 balloonPosWithAmplitude = glm::vec3(0.0f,balloonVerticalOffset , 0.0f) + balloonPos;
+
         ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(-20.0f, 1.0f + verticalOffset, 20.0f));
-        ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
+        ModelMatrix = glm::translate(ModelMatrix, balloonPosWithAmplitude);
+
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.05f, 0.04f, 0.05f));
         CurrentShader->SetModel(ModelMatrix);
         Balloon.Render();
+
+
 
         float PitchRadians = glm::radians(State.mCannonState->mPitch);
         float YawRadians = glm::radians(State.mCannonState->mYaw);
@@ -715,6 +782,37 @@ int main() {
         State.mCannonState->mForwardVector = glm::normalize(CannonForwardVector);
         State.mCannonState->mBarrelEnd = CannonPos + CannonLenght * CannonForwardVector + glm::vec3(0.0f, 1.50f, 0.0f);
 
+        glm::vec3 ballPosition = glm::vec3(State.mCannonState->mBarrelEnd);
+        float scaling = 0.4f / 0.2f;
+
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, ballPosition);
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+        CurrentShader->SetModel(ModelMatrix);
+        Beachball.Render();
+
+        float redScale = State.mCannonState->mStrenght / 60.0f;
+        glm::vec3 redColor = glm::mix(glm::vec3(1.0f), glm::vec3(1.0f, 0.0f, 0.0f), redScale);
+        glm::vec3 diffmix = glm::mix(glm::vec3(0.8f, 0.8f, 0.6f), glm::vec3(1.0f, 0.0f, 0.0f), redScale * 0.3f);
+
+        // Use the calculated color
+        PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ka", redColor * 0.3f);  // Ambient component
+        PhongShaderMaterialTexture.SetUniform3f("uPointLight.Kd", redColor * 0.6f);  // Diffuse component
+        PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
+
+        PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ka", redColor * 0.9f);  // Ambient component
+        PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Kd", redColor * 0.4f);  // Diffuse component
+        PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
+
+        // Directional light
+        //PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ka", diffmix );  // Warm ambient color
+        PhongShaderMaterialTexture.SetUniform3f("uDirLight.Kd", redColor * 0.6f);  // Diffuse component
+        PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(0.8f, 0.8f, 0.8f));  // Specular component
+
+
+
+
+
         ModelMatrix = glm::mat4(1.0f);
         ModelMatrix = glm::translate(ModelMatrix, CannonPos);
         ModelMatrix = glm::translate(ModelMatrix,- CannonCenterDelta);
@@ -727,18 +825,10 @@ int main() {
         CurrentShader->SetModel(ModelMatrix);
         Cannon.Render();
 
-        float scaling = 0.4f / 0.2f;
+        SetupPhongLight(*CurrentShader);
 
 
 
-        // Extract the transformed position as glm::vec3
-        glm::vec3 ballPosition = glm::vec3(State.mCannonState->mBarrelEnd) ;
-
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, ballPosition);
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
-        CurrentShader->SetModel(ModelMatrix);
-        Beachball.Render();
         
 
 
@@ -755,9 +845,11 @@ int main() {
                 Beachball.Render();
 
                 if(!freezed)updateSphere(sphere, MovementStep);
+                if (!freezed)checkBalloonHit(sphere,1.0f,balloonPosWithAmplitude );
             }
 
             if (!freezed)checkConstraints(SphereList,PlaneList,CylinderList);
+
         }
         else {
 
@@ -769,6 +861,7 @@ int main() {
                 CurrentShader->SetModel(ModelMatrix);
                 Beachball.Render();
                 updateSphere(sphere, State.mDT);
+                checkBalloonHit(sphere, 1.0f, balloonPosWithAmplitude);
             }
 
             checkConstraints(SphereList, PlaneList, CylinderList);
@@ -785,6 +878,9 @@ int main() {
 
 
         #pragma endregion
+
+
+        glUseProgram(0);
         
         #pragma region skybox
 
@@ -836,6 +932,8 @@ int main() {
     glfwTerminate();
     return 0;
 }
+
+
 
 
 
