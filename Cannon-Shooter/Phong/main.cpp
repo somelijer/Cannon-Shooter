@@ -40,12 +40,17 @@ float MovementStep = 1.5F / TargetFPS;
 
 float CannonError = 0.01f;
 
+bool CatAnimationActive = false;
+int CatAnimationCounter = 0;
+
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_real_distribution<float> CannonErrorDistribution(-CannonError, CannonError);
 std::uniform_real_distribution<float> BalloonPositionDistribution(10.0f, 30.0f);
 
 glm::vec3 balloonPos;
+
+float CatRotationAngle = glm::radians(-3.1419f);
 
 struct Input {
     bool MoveLeft;
@@ -362,9 +367,47 @@ void checkBalloonHit(Sphere* sphere,float balloonRadius, glm::vec3 ballonPosWith
         balloonPos = glm::vec3(BalloonPositionDistribution(gen), BalloonPositionDistribution(gen)  - 8.f, BalloonPositionDistribution(gen));
         PlayerScore += 1;
         std::cout << "Balloon popped! Player Score: " << PlayerScore << std::endl << std::endl;
+        if (PlayerScore % 2 == 0) {
+            CatRotationAngle = glm::radians(-3.1419f);
+            CatAnimationActive = true;
+        }
     }
 
 }
+
+void DoCatCelebration(float& CatRotationAngle, EngineState& State, float CatVerticalMotionAmplitude, glm::mat4& ModelMatrix, Shader* CurrentShader, Model& Cat)
+{
+    glm::vec3 CannonPos = glm::vec3(5.0f, 1.8f, 0.0f);
+    CatRotationAngle += State.mDT * 8;
+    float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
+
+    float distanceBetweenObjects = 5.0f;
+
+
+    glm::vec3 objectPositionLeft = CannonPos + distanceBetweenObjects * glm::normalize( glm::cross(State.mCannonState->mForwardVector, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 objectPositionRight = CannonPos -  distanceBetweenObjects * glm::normalize( glm::cross(State.mCannonState->mForwardVector, glm::vec3(0.0f, 1.0f, 0.0f)));
+
+    ModelMatrix = glm::mat4(1.0f);
+    ModelMatrix = glm::translate(ModelMatrix, glm::vec3(objectPositionLeft.x, 0.0f + verticalOffset, objectPositionLeft.z));
+    ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.1f, 0.1f, 0.1f));
+    CurrentShader->SetModel(ModelMatrix);
+    Cat.Render();
+
+    ModelMatrix = glm::mat4(1.0f);
+    ModelMatrix = glm::translate(ModelMatrix, glm::vec3(objectPositionRight.x, 0.0f + verticalOffset, objectPositionRight.z));
+    ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.1f, 0.1f, 0.1f));
+    CurrentShader->SetModel(ModelMatrix);
+    Cat.Render();
+
+    CatAnimationCounter += 1;
+    if (CatAnimationCounter >= 45) {
+        CatAnimationCounter = 0;
+        CatAnimationActive = false;
+    }
+}
+
 
 int main() {
     GLFWwindow* Window = 0;
@@ -443,26 +486,8 @@ int main() {
     
     #pragma endregion 
 
-    #pragma region cube_setup
+    #pragma region vao_vbo_setup
 
-    float indicatorVertices[] = {
-    -0.9f, -0.5f,
-    -0.9f,  0.5f,
-    -0.8f,  0.5f,
-    -0.8f, -0.5f,
-    };
-
-    unsigned int indicatorVBO, indicatorVAO;
-    glGenVertexArrays(1, &indicatorVAO);
-    glGenBuffers(1, &indicatorVBO);
-
-    glBindVertexArray(indicatorVAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, indicatorVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(indicatorVertices), indicatorVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
 
 
     std::vector<float> CubeVertices = {
@@ -626,7 +651,6 @@ int main() {
         return -1;
     }
 
-    AddPalmLocations();
 
     #pragma endregion
 
@@ -652,41 +676,6 @@ int main() {
 
     #pragma endregion
 
-
-    // Define the range
-    std::uniform_real_distribution<float> dis(-10.0f, 10.0f);
-
-    
-    /*for (int i = 1; i < 15; i++) {
-        float pos = static_cast<float>(i * 3);
-        Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, dis(gen) + 10.0f , -30.0f + dis(gen)/2), glm::vec3(dis(gen), dis(gen), dis(gen)) };
-        SphereList.push_back(sphere);
-    }
-
-    for (int i = 1; i < 15; i++) {
-        float pos = static_cast<float>(i/3 );
-        Sphere* sphere = new Sphere{ 10.0f, 0.4f, glm::vec3(10.0f, pos /2, +5.f + pos /2), glm::vec3(0.0f) };
-        SphereList.push_back(sphere);
-    }
-    {
-        Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, 6.f, -20.2f), glm::vec3(0.0f) };
-        SphereList.push_back(sphere1);
-
-        Sphere* sphere2 = new Sphere{10.0f, 0.4f, glm::vec3(0.0f, 2.f, -20.f), glm::vec3(0.0f,1.0f,0.0f)};
-        SphereList.push_back(sphere2);
-        Sphere* sphere3 = new Sphere{ 10.0f, 0.4f, glm::vec3(0.0f, 4.f, -19.8f), glm::vec3(0.0f,1.0f,0.0f) };
-        SphereList.push_back(sphere3);
-
-    }
-
-    {
-
-        Sphere* sphere2 = new Sphere{ 10.0f, 0.4f, glm::vec3(3.0f, 2.f, -20.2f), glm::vec3(0.0f,1.0f,0.0f) };
-        SphereList.push_back(sphere2);
-        Sphere* sphere1 = new Sphere{ 10.0f, 0.4f, glm::vec3(3.0f, 6.f, -20.f), glm::vec3(0.0f) };
-        SphereList.push_back(sphere1);
-
-    }*/
     
     glm::mat4 Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 200.0f);
     glm::mat4 View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
@@ -698,7 +687,7 @@ int main() {
 
     glClearColor(0.604f, 0.792f, 0.906f, 0.0f);
 
-    float CatRotationAngle = glm::radians(45.0f);
+
     float CatVerticalMotionAmplitude = 4.0f; 
     float CatVerticalMotionFrequency = 1.0f;
 
@@ -711,7 +700,8 @@ int main() {
     PlaneList.push_back(new Plane{ glm::vec3(0.0f, 1.0f, 0.0f), 0.1f });
 
     balloonPos =  glm::vec3(10.0f, 1.8f, -10.0f);
-
+    
+    AddPalmLocations();
     
 
     
@@ -721,9 +711,6 @@ int main() {
         HandleInput(&State);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // NOTE(Jovan): In case of window resize, update projection. Bit bad for performance to do it every iteration.
-        // If laggy, remove this line
-        //Projection = glm::perspective(45.0f, WindowWidth / (float)WindowHeight, 0.1f, 100.0f);
         View = glm::lookAt(FPSCamera.GetPosition(), FPSCamera.GetTarget(), FPSCamera.GetUp());
         StartTime = glfwGetTime();
         
@@ -738,18 +725,12 @@ int main() {
         
         #pragma region dynamic_elements_draw
 
-        CatRotationAngle += State.mDT * 8;
-        float verticalOffset = CatVerticalMotionAmplitude * sin(CatRotationAngle / 2);
-
         BalloonRotationAngle += State.mDT * 4;
         float balloonVerticalOffset = BalloonVerticalMotionAmplitude * sin(BalloonRotationAngle / 2);
 
-        ModelMatrix = glm::mat4(1.0f);
-        ModelMatrix = glm::translate(ModelMatrix, glm::vec3(20.0f, 1.0f + verticalOffset, 20.0f));
-        ModelMatrix = glm::rotate(ModelMatrix, CatRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
-        CurrentShader->SetModel(ModelMatrix);
-        Cat.Render();
+        if (CatAnimationActive) {
+            DoCatCelebration(CatRotationAngle, State, CatVerticalMotionAmplitude, ModelMatrix, CurrentShader, Cat);
+        }
 
 
 
@@ -805,7 +786,6 @@ int main() {
         PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ks", glm::vec3(1.0f, 1.0f, 1.0f));  // Specular component
 
         // Directional light
-        //PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ka", diffmix );  // Warm ambient color
         PhongShaderMaterialTexture.SetUniform3f("uDirLight.Kd", redColor * 0.6f);  // Diffuse component
         PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(0.8f, 0.8f, 0.8f));  // Specular component
 
@@ -827,11 +807,9 @@ int main() {
 
         SetupPhongLight(*CurrentShader);
 
+        #pragma endregion
 
-
-        
-
-
+        #pragma region movement
 
         if (MovementDebug) {
 
@@ -879,11 +857,9 @@ int main() {
 
         #pragma endregion
 
-
-        glUseProgram(0);
-        
         #pragma region skybox
 
+        glUseProgram(0);
         glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
         glUseProgram(SkyboxShader.GetId());
         View = glm::mat4(glm::mat3(View)); // remove translation from the view matrix
@@ -917,7 +893,6 @@ int main() {
             continue;
         }
 
-        // NOTE(Jovan): Time management
         EndTime = glfwGetTime();
         float WorkTime = EndTime - StartTime;
         if (WorkTime < TargetFrameTime) {
@@ -932,6 +907,7 @@ int main() {
     glfwTerminate();
     return 0;
 }
+
 
 
 
