@@ -26,6 +26,8 @@ const std::string WindowTitle = "Cannon Shooter";
 double lastX = 90;
 double lastY = 90;
 list<Sphere*> SphereList;
+list<Plane*> PlaneList;
+list<Cylinder*> CylinderList;
 float LastShootTime = glfwGetTime();
 float CannonUpperShootLimit = 60.0f;
 float CannonLowerShootLimit = 5.0f;
@@ -559,7 +561,7 @@ int main() {
     PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kq", 0.032f);
 
     // Adjust spotlight (simulating the sun casting shadows)
-    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(0.0f, 155.0f, 0.0f));
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(100.0f, 100.0f, 50.5f));
     PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Direction", glm::vec3(0.0f, -1.0f, 0.0f));
     PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ka", glm::vec3(0.1f, 0.1f, 0.1f));  // Ambient component
     PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
@@ -630,6 +632,13 @@ int main() {
     float CatVerticalMotionAmplitude = 4.0f; 
     float CatVerticalMotionFrequency = 1.0f;
     glm::vec3 CannonPos = glm::vec3(5.0f, 1.8f, 0.0f);
+
+    PlaneList.push_back(new Plane{ glm::vec3(0.0f, 1.0f, 0.0f), 0.1f });
+    PlaneList.push_back(new Plane{ glm::vec3(1.0f, 1.0f, 0.0f), -20.1f });
+
+    glm::vec3 CylPos1 = glm::vec3(20.0f, 1.0f, 2.0f);
+    glm::vec3 CylPos2 = glm::vec3(20.0f, 5.0f, 0.0f);
+    CylinderList.push_back(new Cylinder{ 1.0f, CylPos1 , CylPos2 });
 
     
     Shader* CurrentShader = &PhongShaderMaterialTexture;
@@ -714,6 +723,21 @@ int main() {
         CurrentShader->SetModel(ModelMatrix);
         Beachball.Render();
         
+
+        scaling = 1.0f / 0.2f;
+
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, CylPos1);
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+        CurrentShader->SetModel(ModelMatrix);
+        Beachball.Render();
+
+        ModelMatrix = glm::mat4(1.0f);
+        ModelMatrix = glm::translate(ModelMatrix, CylPos2);
+        ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+        CurrentShader->SetModel(ModelMatrix);
+        Beachball.Render();
+
         if (MovementDebug) {
 
             bool freezed = IsFreezed();
@@ -728,7 +752,7 @@ int main() {
                 if(!freezed)updateSphere(sphere, MovementStep);
             }
 
-            if (!freezed)checkConstraints(SphereList);
+            if (!freezed)checkConstraints(SphereList,PlaneList,CylinderList);
         }
         else {
 
@@ -742,7 +766,7 @@ int main() {
                 updateSphere(sphere, State.mDT);
             }
 
-            checkConstraints(SphereList);
+            checkConstraints(SphereList, PlaneList, CylinderList);
         }
      
 

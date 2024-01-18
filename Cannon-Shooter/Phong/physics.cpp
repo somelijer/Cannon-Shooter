@@ -12,31 +12,26 @@ void rk4Step(glm::vec3& position, glm::vec3& velocity,
     float dt) {
     glm::vec3 k1, k2, k3, k4;
 
-    // Evaluate k1
     k1 = dt * velocity;
 
-    // Evaluate k2
     k2 = dt * glm::vec3(
         accelerationX(position + 0.5f * k1, velocity),
         accelerationY(position + 0.5f * k1, velocity),
         accelerationZ(position + 0.5f * k1, velocity)
     );
 
-    // Evaluate k3
     k3 = dt * glm::vec3(
         accelerationX(position + 0.5f * k2, velocity),
         accelerationY(position + 0.5f * k2, velocity),
         accelerationZ(position + 0.5f * k2, velocity)
     );
 
-    // Evaluate k4
     k4 = dt * glm::vec3(
         accelerationX(position + k3, velocity),
         accelerationY(position + k3, velocity),
         accelerationZ(position + k3, velocity)
     );
 
-    // Update velocity and position using RK4 formula
     velocity += (k1 + 2.0f * k2 + 2.0f * k3 + k4) / 6.0f;
     position += dt * velocity;
 }
@@ -45,12 +40,10 @@ void rk4Step(glm::vec3& position, glm::vec3& velocity,
 const double GRAVITY_ACC = 9.81;
 const double AIR_RESIS = 0.1;
 
-// Function to calculate gravitational force
 glm::vec3 calculateGravityForce(float mass) {
     return glm::vec3(0.0,-(float)(mass * GRAVITY_ACC), 0.0);
 }
 
-// Function to calculate drag force
 glm::vec3 calculateDragForce(const glm::vec3& speed, double dragConst) {
     double speedNorm = glm::length(speed);
     glm::vec3 ret = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -100,14 +93,67 @@ void handleSphereCollision(Sphere* sphere1, Sphere* sphere2) {
 
 }
 
-void checkConstraints(std::list<Sphere*>& sphereList)
+
+void handleSphereCollisionWithPlane(Sphere* sphere, const glm::vec3& planeNormal, float planeConstant) {
+    float distanceToPlane = glm::dot(planeNormal, sphere->Position) - planeConstant;
+
+    if (distanceToPlane < sphere->Radius) {
+        sphere->Position -= (distanceToPlane - sphere->Radius) * planeNormal;
+        sphere->Velocity = glm::reflect(sphere->Velocity, planeNormal) * elasticity;
+    }
+}
+
+void handleSphereCollisionWithCylinder(Sphere* sphere, Cylinder* cylinder) {
+
+    glm::vec3 AB = cylinder->PointB - cylinder->PointA;
+    glm::vec3 AC = sphere->Position - cylinder->PointA;
+    glm::vec3 BC = sphere->Position - cylinder->PointB;
+
+
+    float scalarProjection = glm::dot(AC, AB) / glm::dot(AB, AB);
+
+    glm::vec3 closestPointOnLine = cylinder->PointA + scalarProjection * AB;
+
+    if (scalarProjection > 1 || scalarProjection < 0) return;
+
+    glm::vec3 normal = AC - scalarProjection * AB;
+
+    float distance = glm::length(normal);
+    normal = glm::normalize(normal);
+
+
+    if (distance < sphere->Radius + cylinder->Radius) {
+        sphere->Position -= (distance - sphere->Radius) * -normal;
+        sphere->Velocity = glm::reflect(sphere->Velocity, -normal) * elasticity;
+
+        std::cout << "Collision detected! ==================" << std::endl;
+        std::cout << "Cylinder: PointA(" << cylinder->PointA.x << ", " << cylinder->PointA.y << ", " << cylinder->PointA.z << ")";
+        std::cout << " PointB(" << cylinder->PointB.x << ", " << cylinder->PointB.y << ", " << cylinder->PointB.z << ")";
+        std::cout << " Radius: " << cylinder->Radius << std::endl;
+        std::cout << "Sphere: Position(" << sphere->Position.x << ", " << sphere->Position.y << ", " << sphere->Position.z << ")";
+        std::cout << " Radius: " << sphere->Radius << std::endl;
+        std::cout << "Closest Point on Line: (" << closestPointOnLine.x << ", " << closestPointOnLine.y << ", " << closestPointOnLine.z << ")" << std::endl;
+        std::cout << "Normal: (" << normal.x << ", " << normal.y << ", " << normal.z << ")" << std::endl;
+        std::cout << "Scalar projection: " << scalarProjection << std::endl;
+        std::cout << "Distance: " << distance << std::endl << std::endl;
+    }
+
+
+}
+
+void checkConstraints(std::list<Sphere*>& sphereList, std::list<Plane*>& planeList, std::list<Cylinder*>& cylinderList)
 {
     for (auto outerSphereIt = sphereList.begin(); outerSphereIt != sphereList.end(); ++outerSphereIt) {
         Sphere* sphere = *outerSphereIt;
 
-        FloorConstraint(sphere);
+        for (Plane* plane : planeList) {
+            handleSphereCollisionWithPlane(sphere, plane->planeNormal, plane->planeConstant);
+        }
+        
+        for (Cylinder* cylinder : cylinderList) {
+            handleSphereCollisionWithCylinder(sphere,cylinder);
+        }
 
-        // Iterate from the position of the outer loop until the end
         for (auto innerSphereIt = outerSphereIt; innerSphereIt != sphereList.end(); ++innerSphereIt) {
             Sphere* otherSphere = *innerSphereIt;
 
@@ -120,14 +166,9 @@ void checkConstraints(std::list<Sphere*>& sphereList)
     
 }
 
-void FloorConstraint(Sphere* sphere)
-{
-    if (sphere->Position.y - sphere->Radius < floorHeight) {
-        sphere->Position.y = floorHeight + sphere->Radius;
-        sphere->Velocity.y *= -1;
-        sphere->Velocity *= elasticity;
-    }
-}
+
+
+
 
 void updateSphere(Sphere* sphere,float dt) {
 

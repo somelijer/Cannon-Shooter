@@ -15,9 +15,18 @@ struct Sphere {
     glm::vec3 Velocity;
 };
 
-void checkConstraints(std::list<Sphere*>& sphereList);
+struct Cylinder {
+    float Radius;
+    glm::vec3 PointA;
+    glm::vec3 PointB;
+};
 
-void FloorConstraint(Sphere* sphere);
+struct Plane {
+    glm::vec3 planeNormal;
+    float planeConstant;
+};
+
+void checkConstraints(std::list<Sphere*>& sphereList, std::list<Plane*>& planeList, std::list<Cylinder*>& cylinderList);
 
 void updateSphere(Sphere* sphere, float dt);
 
