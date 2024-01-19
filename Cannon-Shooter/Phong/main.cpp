@@ -20,7 +20,7 @@ using namespace std;
 
 
 int WindowWidth = 1600;
-int WindowHeight = 1200;
+int WindowHeight = 900;
 const float TargetFPS = 60.0f;
 const std::string WindowTitle = "Cannon Shooter";
 double lastX = 90;
@@ -477,12 +477,42 @@ int main() {
     unsigned SkyboxTexture = Texture::LoadImageToTexture("res/skybox.png");
     unsigned MetalTexture = Texture::LoadImageToTexture("res/metal.jpg");
     unsigned RustyMetalTexture = Texture::LoadImageToTexture("res/rusty_metal.jpg");
+    unsigned SignatureTexture = Texture::LoadImageToTexture("res/potpis.png");
 
     
     #pragma endregion 
 
     #pragma region vao_vbo_setup
 
+    float signatureVertices[] =
+    {
+        //  X     Y      H    V
+          -1.0, -1.0,   0.0, 0.0,
+           1.0, -1.0,   1.0, 0.0,
+           1.0,  1.0,   1.0, 1.0,
+
+          -1.0, -1.0,   0.0, 0.0,
+           1.0,  1.0,   1.0, 1.0,
+          -1.0,  1.0,   0.0, 1.0
+    };
+
+
+    unsigned int VAO_signature, VBO_signature;
+    glGenVertexArrays(1, &VAO_signature);
+    glGenBuffers(1, &VBO_signature);
+
+    // index and name attributes
+    glBindVertexArray(VAO_signature);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_signature);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(signatureVertices), signatureVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, (2 + 2) * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, (2 + 2) * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
 
     std::vector<float> CubeVertices = {
@@ -664,10 +694,9 @@ int main() {
     SetupPhongLight(PhongShaderMaterialTexture);
     glUseProgram(0);
     
-    
+
     Shader Color2dShader("shaders/2dcolor.vert", "shaders/2dcolor.frag");
     glUseProgram(0);
-
 
     #pragma endregion
 
@@ -851,6 +880,14 @@ int main() {
 
 
         #pragma endregion
+
+        glUseProgram(Color2dShader.GetId());
+        glBindVertexArray(VAO_signature);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, SignatureTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindVertexArray(0);
 
         #pragma region skybox
 

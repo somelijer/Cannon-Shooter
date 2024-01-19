@@ -1,8 +1,16 @@
 #version 330 core
-out vec4 FragColor;
-uniform vec3 color;
+
+in vec2 chTex; 
+out vec4 outCol; 
+
+uniform sampler2D uTex; 
 
 void main()
 {
-    FragColor = vec4(color, 1.0);
+    vec4 texColor = texture(uTex, chTex);
+
+    if (texColor.a <= 0.1)
+        discard;
+
+    outCol = vec4(texColor.r,texColor.g,texColor.b,0.5);
 }
