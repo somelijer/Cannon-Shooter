@@ -34,7 +34,7 @@ float LastShootTime = glfwGetTime();
 float CannonUpperShootLimit = 60.0f;
 float CannonLowerShootLimit = 5.0f;
 
-bool MovementDebug = true;
+bool MovementDebug = false;
 bool MovementDebugFreeze = true;
 float MovementStep = 1.5F / TargetFPS;
 
