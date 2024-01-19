@@ -1,4 +1,5 @@
 #include <glm/ext/vector_float3.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <list>
 #ifndef PHYSICS_HPP
 #define PHYSICS_HPP
@@ -13,6 +14,7 @@ struct Sphere {
     float Radius;
     glm::vec3 Position;
     glm::vec3 Velocity;
+    glm::quat Orientation;
 };
 
 struct Cylinder {

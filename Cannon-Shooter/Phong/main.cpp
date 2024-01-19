@@ -34,7 +34,7 @@ float LastShootTime = glfwGetTime();
 float CannonUpperShootLimit = 60.0f;
 float CannonLowerShootLimit = 5.0f;
 
-bool MovementDebug = false;
+bool MovementDebug = true;
 bool MovementDebugFreeze = true;
 float MovementStep = 1.5F / TargetFPS;
 
@@ -47,6 +47,7 @@ std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_real_distribution<float> CannonErrorDistribution(-CannonError, CannonError);
 std::uniform_real_distribution<float> BalloonPositionDistribution(10.0f, 30.0f);
+std::uniform_real_distribution<float> BallOrientationDistribution(0.0f, 90.0f);
 
 glm::vec3 balloonPos;
 
@@ -169,7 +170,7 @@ void ShootBall(EngineState* state) {
 
     if (glfwGetTime() - LastShootTime > 0.5) {
         float speed = 5.0f;
-        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, shootvector * state->mCannonState->mStrenght };
+        Sphere* sphere = new Sphere{ 10.0f, 0.4f, state->mCannonState->mBarrelEnd, shootvector * state->mCannonState->mStrenght, glm::quat(glm::vec3(BallOrientationDistribution(gen),BallOrientationDistribution(gen),BallOrientationDistribution(gen)))};
         SphereList.push_back(sphere);
         LastShootTime = glfwGetTime();
     }
@@ -318,6 +319,41 @@ void SetupPhongLight(Shader PhongShaderMaterialTexture)
     PhongShaderMaterialTexture.SetUniform1i("uMaterial.Kd", 0);
     PhongShaderMaterialTexture.SetUniform1i("uMaterial.Ks", 1);
     PhongShaderMaterialTexture.SetUniform1f("uMaterial.Shininess", 70.0f);  // Reduce shininess for a rough surface
+}
+
+void SetupPhongFloorLight(Shader PhongShaderMaterialTexture)
+{
+    // Adjust directional light (sun)
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Direction", glm::vec3(1.0f, -1.0f, 0.5f));
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ka", glm::vec3(0.8f, 0.8f, 0.6f));  // Warm ambient color
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Kd", glm::vec3(0.9f, 0.9f, 0.7f));  // Diffuse color
+    PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(0.0f, 0.0f, 0.0f));  // No specular color
+
+    // Adjust point light (simulating a distant light source)
+    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ka", glm::vec3(0.2f, 0.2f, 0.2f));  // Ambient component
+    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Kd", glm::vec3(0.8f, 0.8f, 0.6f));  // Diffuse component
+    PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ks", glm::vec3(0.0f, 0.0f, 0.0f));  // No specular color
+    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kc", 1.0f);
+    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kl", 0.092f);
+    PhongShaderMaterialTexture.SetUniform1f("uPointLight.Kq", 0.032f);
+
+    // Adjust spotlight (simulating the sun casting shadows)
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Position", glm::vec3(100.0f, 100.0f, 50.5f));
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Direction", glm::vec3(0.0f, -1.0f, 0.0f));
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ka", glm::vec3(0.1f, 0.1f, 0.1f));  // Ambient component
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Kd", glm::vec3(0.1f, 0.1f, 0.1f));  // Diffuse component
+    PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ks", glm::vec3(0.0f, 0.0f, 0.0f));  // No specular color
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kc", 1.0f);
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kl", 0.092f);
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.Kq", 0.032f);
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.InnerCutOff", glm::cos(glm::radians(5.0f)));
+    PhongShaderMaterialTexture.SetUniform1f("uSpotlight.OuterCutOff", glm::cos(glm::radians(15.0f)));
+
+    // Adjust material properties for a sandy appearance
+    PhongShaderMaterialTexture.SetUniform1i("uMaterial.Kd", 0);
+    PhongShaderMaterialTexture.SetUniform1i("uMaterial.Ks", 1);
+    PhongShaderMaterialTexture.SetUniform1f("uMaterial.Shininess", 70.0f);  // Reduce shininess for a rough surface
+
 }
 
 
@@ -840,9 +876,25 @@ int main() {
             bool freezed = IsFreezed();
             for (auto sphere : SphereList) {
                 float scaling = sphere->Radius / 0.2f;
-                ModelMatrix = glm::mat4(1.0f);
+
+                glm::vec3 rotationAxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), sphere->Velocity));
+                float ballSpeed = glm::distance(glm::vec3(0.0f, 0.0f, 0.0f), sphere->Velocity);
+                float speedPercent = ballSpeed / CannonUpperShootLimit;
+                if (speedPercent < 0.01)speedPercent = 0;
+
+                glm::quat lastOrientation = sphere->Orientation;
+
+                float spinAngle = State.mDT * speedPercent * 20;
+                glm::quat spinQuaternion = glm::angleAxis(spinAngle, rotationAxis);
+                if (!freezed)sphere->Orientation = spinQuaternion * lastOrientation;
+
+                glm::mat4 rotationMatrix = glm::toMat4(sphere->Orientation);
+
+                glm::mat4 ModelMatrix = glm::mat4(1.0f);
                 ModelMatrix = glm::translate(ModelMatrix, sphere->Position);
+                ModelMatrix = ModelMatrix * rotationMatrix;
                 ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+
                 CurrentShader->SetModel(ModelMatrix);
                 Beachball.Render();
 
@@ -857,9 +909,25 @@ int main() {
 
             for (auto sphere : SphereList) {
                 float scaling = sphere->Radius / 0.2f;
-                ModelMatrix = glm::mat4(1.0f);
+
+                glm::vec3 rotationAxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), sphere->Velocity));
+                float ballSpeed = glm::distance(glm::vec3(0.0f, 0.0f, 0.0f), sphere->Velocity);
+                float speedPercent = ballSpeed / CannonUpperShootLimit;
+                if (speedPercent < 0.01)speedPercent = 0;
+
+                glm::quat lastOrientation = sphere->Orientation;
+
+                float spinAngle = State.mDT * speedPercent * 20; 
+                glm::quat spinQuaternion = glm::angleAxis(spinAngle, rotationAxis);
+                sphere->Orientation = spinQuaternion * lastOrientation;
+
+                glm::mat4 rotationMatrix = glm::toMat4(sphere->Orientation);
+
+                glm::mat4 ModelMatrix = glm::mat4(1.0f);
                 ModelMatrix = glm::translate(ModelMatrix, sphere->Position);
+                ModelMatrix = ModelMatrix * rotationMatrix; 
                 ModelMatrix = glm::scale(ModelMatrix, glm::vec3(scaling, scaling, scaling));
+
                 CurrentShader->SetModel(ModelMatrix);
                 Beachball.Render();
                 updateSphere(sphere, State.mDT);
@@ -876,10 +944,15 @@ int main() {
 
 
         AddPalms(ModelMatrix, CurrentShader, Palm);
+
+        PhongShaderMaterialTexture.SetUniform3f("uSpotlight.Ks", glm::vec3(0.0f, 0.0f, 0.0f));  // Specular component
+        PhongShaderMaterialTexture.SetUniform3f("uDirLight.Ks", glm::vec3(0.1f, 0.1f, 0.1f));  // Specular color
+        PhongShaderMaterialTexture.SetUniform3f("uPointLight.Ks", glm::vec3(0.1f, 0.1f, 0.1f));  // Specular color
+
+        SetupPhongFloorLight(*CurrentShader);
+
+
         DrawFloor(CubeVAO, *CurrentShader, FloorTexture1);
-
-
-        #pragma endregion
 
         glUseProgram(Color2dShader.GetId());
         glBindVertexArray(VAO_signature);
@@ -888,6 +961,9 @@ int main() {
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindVertexArray(0);
+
+        #pragma endregion
+
 
         #pragma region skybox
 
