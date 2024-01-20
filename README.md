@@ -4,7 +4,7 @@
  The end result is a game where the player shoots balls from a cannon trying to hit the balloon tagets.
 
  The physics are based on RK4 method aproximations with gravity and air resistance affecting the balls.
- The constraints implemented are ball on ball colision and ball - plane and ball - cylinder constraints.
+ The constraints implemented are ball on ball colision, ball - plane and ball - cylinder constraints.
 
  The game can run in regular mode and in MovementDebug mode which is set on top of main.cpp.
  MovementDebug mode lets the player see frame by frame movements of balls on the press of key F.
