@@ -34,7 +34,7 @@ float LastShootTime = glfwGetTime();
 float CannonUpperShootLimit = 60.0f;
 float CannonLowerShootLimit = 5.0f;
 
-bool MovementDebug = false;
+bool MovementDebug = true;
 bool MovementDebugFreeze = true;
 float MovementStep = 1.5F / TargetFPS;
 
@@ -886,7 +886,7 @@ int main() {
 
                 float spinAngle = State.mDT * speedPercent * 20;
                 glm::quat spinQuaternion = glm::angleAxis(spinAngle, rotationAxis);
-                if (!freezed)sphere->Orientation = spinQuaternion * lastOrientation;
+                if ((!freezed) && speedPercent >= 0.01f)sphere->Orientation = spinQuaternion * lastOrientation;
 
                 glm::mat4 rotationMatrix = glm::toMat4(sphere->Orientation);
 
@@ -906,20 +906,19 @@ int main() {
 
         }
         else {
-
             for (auto sphere : SphereList) {
                 float scaling = sphere->Radius / 0.2f;
 
                 glm::vec3 rotationAxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), sphere->Velocity));
                 float ballSpeed = glm::distance(glm::vec3(0.0f, 0.0f, 0.0f), sphere->Velocity);
                 float speedPercent = ballSpeed / CannonUpperShootLimit;
-                if (speedPercent < 0.01)speedPercent = 0;
+                if (speedPercent < 0.01f)speedPercent = 0;
 
                 glm::quat lastOrientation = sphere->Orientation;
 
                 float spinAngle = State.mDT * speedPercent * 20; 
                 glm::quat spinQuaternion = glm::angleAxis(spinAngle, rotationAxis);
-                sphere->Orientation = spinQuaternion * lastOrientation;
+                if(speedPercent >= 0.01f)sphere->Orientation = spinQuaternion * lastOrientation;
 
                 glm::mat4 rotationMatrix = glm::toMat4(sphere->Orientation);
 
